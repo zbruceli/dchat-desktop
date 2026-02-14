@@ -1,0 +1,22 @@
+appId: com.dchat.desktop
+productName: D-Chat Desktop
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - package.json
+mac:
+  category: public.app-category.social-networking
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+    - portable
+linux:
+  category: Network
+  target:
+    - AppImage
+    - deb
