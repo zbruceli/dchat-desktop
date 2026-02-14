@@ -15,4 +15,12 @@ export function registerChatHandlers(chatService: ChatService): void {
   ipcMain.handle(IPC.CHAT.GET_MESSAGES, (_event, sessionId: string) => {
     return chatService.getMessages(sessionId);
   });
+
+  ipcMain.handle(IPC.CHAT.START_SESSION, (_event, targetAddress: string) => {
+    return chatService.startSession(targetAddress);
+  });
+
+  ipcMain.handle(IPC.CHAT.MARK_READ, (_event, sessionId: string) => {
+    chatService.markSessionRead(sessionId);
+  });
 }

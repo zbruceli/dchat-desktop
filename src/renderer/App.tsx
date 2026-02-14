@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useClientStore } from "./stores/client-store";
+import { useNavStore } from "./stores/nav-store";
 import { useIpcSubscriptions } from "./hooks/use-ipc-subscriptions";
 import { ConnectionStatus } from "./components/common/ConnectionStatus";
 import { LoginPage } from "./pages/Login/LoginPage";
 import { ChatPage } from "./pages/Chat/ChatPage";
 import { ContactsPage } from "./pages/Contacts/ContactsPage";
+import { WalletPage } from "./pages/Wallet/WalletPage";
 
 type NavItem = "chat" | "contacts" | "wallet" | "settings";
 
@@ -16,16 +18,20 @@ const NAV_ITEMS: { id: NavItem; label: string; icon: string }[] = [
 ];
 
 export function App() {
-  const [activeNav, setActiveNav] = useState<NavItem>("chat");
-  const [appInfo, setAppInfo] = useState<{ name: string; version: string } | null>(null);
+  const activeNav = useNavStore((s) => s.activeNav);
+  const setActiveNav = useNavStore((s) => s.setActiveNav);
+  const [appInfo, setAppInfo] = React.useState<{ name: string; version: string } | null>(null);
   const clientState = useClientStore((s) => s.status.state);
   const disconnect = useClientStore((s) => s.disconnect);
+
+  const autoConnect = useClientStore((s) => s.autoConnect);
 
   useIpcSubscriptions();
 
   useEffect(() => {
     window.dchat?.app.getInfo().then(setAppInfo).catch(console.error);
-  }, []);
+    autoConnect();
+  }, [autoConnect]);
 
   // Show login page if not connected
   if (clientState !== "connected") {
@@ -85,7 +91,7 @@ function PageContent({ activeNav }: { activeNav: NavItem }) {
     case "contacts":
       return <ContactsPage />;
     case "wallet":
-      return <PlaceholderPage title="Wallet" description="NKN wallet management — coming soon" />;
+      return <WalletPage />;
     case "settings":
       return <PlaceholderPage title="Settings" description="App configuration — coming soon" />;
   }

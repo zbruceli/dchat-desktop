@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useContactStore } from "../../stores/contact-store";
 import { useChatStore } from "../../stores/chat-store";
+import { useNavStore } from "../../stores/nav-store";
 import { useSessionStore } from "../../stores/session-store";
 
 export function ContactsPage() {
@@ -8,6 +9,9 @@ export function ContactsPage() {
   const loadContacts = useContactStore((s) => s.loadContacts);
   const addContact = useContactStore((s) => s.addContact);
   const deleteContact = useContactStore((s) => s.deleteContact);
+  const startSession = useChatStore((s) => s.startSession);
+  const setActiveNav = useNavStore((s) => s.setActiveNav);
+  const loadSessions = useSessionStore((s) => s.loadSessions);
 
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -33,13 +37,14 @@ export function ContactsPage() {
     }
   }
 
-  function handleStartChat(contactAddress: string) {
-    // Send an empty message triggers session creation via the IPC layer,
-    // but for now we just switch to chat page with the session active.
-    // The session will be created when the first message is sent.
-    useChatStore.getState().setActiveSession(null);
-    // Navigate happens via App.tsx nav state — for now just show user the address
-    alert(`Start chatting with ${contactAddress} from the Chat tab.`);
+  async function handleStartChat(contactAddress: string) {
+    try {
+      await startSession(contactAddress);
+      await loadSessions();
+      setActiveNav("chat");
+    } catch (err) {
+      console.error("Failed to start chat:", err);
+    }
   }
 
   return (

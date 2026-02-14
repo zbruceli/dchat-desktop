@@ -88,6 +88,12 @@ export class MessageRepository {
       .run(status, Date.now(), id);
   }
 
+  updateSessionId(oldSessionId: string, newSessionId: string): void {
+    this.db
+      .prepare(`UPDATE message SET session_id = ?, updated_at = ? WHERE session_id = ?`)
+      .run(newSessionId, Date.now(), oldSessionId);
+  }
+
   deleteBySessionId(sessionId: string): void {
     this.db.prepare(`DELETE FROM message WHERE session_id = ?`).run(sessionId);
   }

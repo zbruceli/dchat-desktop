@@ -19,6 +19,8 @@ const api = {
       ipcRenderer.invoke("client:disconnect"),
     getStatus: (): Promise<ClientStatus> =>
       ipcRenderer.invoke("client:getStatus"),
+    echoTest: (): Promise<{ success: boolean; rtt: number; error?: string }> =>
+      ipcRenderer.invoke("client:echoTest"),
     onStatusChange: (callback: (status: ClientStatus) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, status: ClientStatus) =>
         callback(status);
@@ -31,6 +33,10 @@ const api = {
       ipcRenderer.invoke("chat:sendMessage", to, content),
     getMessages: (sessionId: string): Promise<Message[]> =>
       ipcRenderer.invoke("chat:getMessages", sessionId),
+    startSession: (targetAddress: string): Promise<{ sessionId: string }> =>
+      ipcRenderer.invoke("chat:startSession", targetAddress),
+    markRead: (sessionId: string): Promise<void> =>
+      ipcRenderer.invoke("chat:markRead", sessionId),
     onMessage: (callback: (message: Message) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, message: Message) =>
         callback(message);
@@ -55,6 +61,12 @@ const api = {
       ipcRenderer.invoke("wallet:import", keystore, password),
     getBalance: (address: string): Promise<string> =>
       ipcRenderer.invoke("wallet:getBalance", address),
+    saveSeed: (seed: string, walletAddress: string): Promise<void> =>
+      ipcRenderer.invoke("wallet:saveSeed", seed, walletAddress),
+    loadSeed: (): Promise<{ seed: string; walletAddress: string } | null> =>
+      ipcRenderer.invoke("wallet:loadSeed"),
+    clearSeed: (): Promise<void> =>
+      ipcRenderer.invoke("wallet:clearSeed"),
   },
   session: {
     list: (): Promise<Session[]> =>

@@ -11,6 +11,8 @@ export const IPC = {
   CHAT: {
     SEND_MESSAGE: "chat:sendMessage",
     GET_MESSAGES: "chat:getMessages",
+    START_SESSION: "chat:startSession",
+    MARK_READ: "chat:markRead",
     ON_MESSAGE: "chat:onMessage",
   },
   CONTACT: {
@@ -24,6 +26,12 @@ export const IPC = {
     IMPORT: "wallet:import",
     GET_BALANCE: "wallet:getBalance",
     EXPORT: "wallet:export",
+    SAVE_SEED: "wallet:saveSeed",
+    LOAD_SEED: "wallet:loadSeed",
+    CLEAR_SEED: "wallet:clearSeed",
+  },
+  CLIENT_EXTRA: {
+    ECHO_TEST: "client:echoTest",
   },
   SESSION: {
     LIST: "session:list",

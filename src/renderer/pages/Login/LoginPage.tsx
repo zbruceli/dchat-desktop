@@ -9,6 +9,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const connect = useClientStore((s) => s.connect);
+  const setWalletAddress = useClientStore((s) => s.setWalletAddress);
 
   async function handleCreate() {
     if (!password) {
@@ -19,8 +20,9 @@ export function LoginPage() {
     setError(null);
     try {
       const wallet = await window.dchat.wallet.create(password);
-      // Store keystore for future sessions
       await window.dchat.settings.set("keystore", wallet.keystore);
+      await window.dchat.wallet.saveSeed(wallet.seed, wallet.address);
+      setWalletAddress(wallet.address);
       await connect(wallet.seed);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create wallet");
@@ -39,6 +41,8 @@ export function LoginPage() {
     try {
       const wallet = await window.dchat.wallet.import(keystore, password);
       await window.dchat.settings.set("keystore", wallet.keystore);
+      await window.dchat.wallet.saveSeed(wallet.seed, wallet.address);
+      setWalletAddress(wallet.address);
       await connect(wallet.seed);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import wallet");
@@ -62,6 +66,8 @@ export function LoginPage() {
         return;
       }
       const wallet = await window.dchat.wallet.import(savedKeystore, password);
+      await window.dchat.wallet.saveSeed(wallet.seed, wallet.address);
+      setWalletAddress(wallet.address);
       await connect(wallet.seed);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wrong password or corrupted keystore");

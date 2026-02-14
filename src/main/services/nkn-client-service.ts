@@ -46,6 +46,7 @@ export class NknClientService extends EventEmitter {
         publicKey: pubkey,
       });
 
+      // nkn-sdk MultiClient already strips __N__. sub-client prefix from src
       this.client.onMessage(({ src, payload }: { src: string; payload: Uint8Array | string }) => {
         let data: string;
         if (payload instanceof Uint8Array) {
