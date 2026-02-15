@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { dialog, ipcMain } from "electron";
 import { IPC } from "../../shared/ipc-channels";
 import type { ChatService } from "../services/chat-service";
 import type { SendMessageParams } from "../../shared/types";
@@ -9,6 +9,31 @@ export function registerChatHandlers(chatService: ChatService): void {
     async (_event, to: string, content: string) => {
       const params: SendMessageParams = { to, content };
       return await chatService.sendMessage(params);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.CHAT.SEND_IMAGE,
+    async (_event, to: string, filePath: string) => {
+      return await chatService.sendImageMessage(to, filePath);
+    },
+  );
+
+  ipcMain.handle(IPC.CHAT.PICK_IMAGE, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp"] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle(
+    IPC.CHAT.DOWNLOAD_IMAGE,
+    async (_event, messageId: string) => {
+      await chatService.retryImageDownload(messageId);
     },
   );
 

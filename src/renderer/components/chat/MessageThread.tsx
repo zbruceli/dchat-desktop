@@ -8,6 +8,7 @@ export function MessageThread() {
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const messagesBySession = useChatStore((s) => s.messagesBySession);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const sendImage = useChatStore((s) => s.sendImage);
   const sessions = useSessionStore((s) => s.sessions);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -34,8 +35,14 @@ export function MessageThread() {
     }
   }
 
+  function handleSendImage() {
+    if (session) {
+      sendImage(session.targetAddress);
+    }
+  }
+
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
         <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
@@ -65,7 +72,7 @@ export function MessageThread() {
       </div>
 
       {/* Input */}
-      <MessageInput onSend={handleSend} />
+      <MessageInput onSend={handleSend} onSendImage={handleSendImage} />
     </div>
   );
 }

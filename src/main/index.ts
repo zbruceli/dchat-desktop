@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, net } from "electron";
 import path from "path";
+import { pathToFileURL } from "url";
 import { initDatabase, closeDatabase } from "./db/database";
 import { MessageRepository } from "./db/repositories/message-repository";
 import { ContactRepository } from "./db/repositories/contact-repository";
@@ -8,6 +9,8 @@ import { NknClientService } from "./services/nkn-client-service";
 import { ChatService } from "./services/chat-service";
 import { ContactService } from "./services/contact-service";
 import { SessionService } from "./services/session-service";
+import { IpfsService } from "./services/ipfs-service";
+import { ImageService } from "./services/image-service";
 import { registerAllHandlers } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
@@ -50,25 +53,62 @@ function pushToRenderer(channel: string, data: unknown): void {
   }
 }
 
+// Register custom protocol for serving cached images
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "dchat-media",
+    privileges: { standard: true, secure: true, supportFetchAPI: true },
+  },
+]);
+
 app.whenReady().then(() => {
   // 1. Initialize database
-  const db = initDatabase(app.getPath("userData"));
+  const userDataPath = app.getPath("userData");
+  const db = initDatabase(userDataPath);
 
   // 2. Create repositories
   const messageRepo = new MessageRepository(db);
   const contactRepo = new ContactRepository(db);
   const sessionRepo = new SessionRepository(db);
 
-  // 3. Create window
+  // 3. Create IPFS + Image services
+  const ipfsService = new IpfsService();
+  const imageService = new ImageService(ipfsService, userDataPath);
+
+  // Load IPFS config from settings (if user customized gateways)
+  const settingsRow = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get("ipfs_config") as { value: string } | undefined;
+  if (settingsRow?.value) {
+    try {
+      const config = JSON.parse(settingsRow.value);
+      if (config.gateways) {
+        ipfsService.setConfig(config);
+      }
+    } catch {
+      // ignore invalid config — defaults to nMobile gateway
+    }
+  }
+
+  // Register dchat-media:// protocol handler
+  protocol.handle("dchat-media", (request) => {
+    const url = new URL(request.url);
+    // dchat-media://image-cache/filename → {userData}/image-cache/filename
+    const filePath = path.join(userDataPath, url.hostname, url.pathname);
+    // Use pathToFileURL to properly encode spaces and special characters in the path
+    return net.fetch(pathToFileURL(filePath).href);
+  });
+
+  // 4. Create window
   createWindow();
 
-  // 4. Create NKN client service with push callbacks
+  // 5. Create NKN client service with push callbacks
   const nknClient = new NknClientService();
   nknClient.on("statusChange", (status) => {
     pushToRenderer(IPC.CLIENT.ON_STATUS_CHANGE, status);
   });
 
-  // 5. Create services
+  // 6. Create services
   const chatService = new ChatService(
     nknClient,
     messageRepo,
@@ -76,11 +116,12 @@ app.whenReady().then(() => {
     contactRepo,
     pushToRenderer,
   );
+  chatService.setImageService(imageService);
   const contactService = new ContactService(contactRepo);
   const sessionService = new SessionService(sessionRepo);
 
-  // 6. Register IPC handlers
-  registerAllHandlers({ nknClient, chatService, contactService, sessionService });
+  // 7. Register IPC handlers
+  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService });
 
   // App info handler
   ipcMain.handle(IPC.APP.GET_INFO, () => ({

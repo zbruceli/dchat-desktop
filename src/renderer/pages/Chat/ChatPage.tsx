@@ -32,9 +32,9 @@ export function ChatPage() {
   }
 
   return (
-    <div className="flex-1 flex">
+    <div className="flex-1 flex min-h-0">
       {/* Session list sidebar */}
-      <div className="w-72 border-r border-gray-800 flex flex-col">
+      <div className="w-72 border-r border-gray-800 flex flex-col min-h-0">
         <div className="px-3 py-3 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-300">Chats</h2>
           <button
@@ -86,7 +86,7 @@ export function ChatPage() {
       </div>
 
       {/* Message thread */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         <MessageThread />
       </div>
     </div>

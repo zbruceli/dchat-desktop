@@ -81,7 +81,23 @@ export class NknClientService extends EventEmitter {
     if (!this.client || this.status.state !== "connected") {
       throw new Error("NKN client not connected");
     }
-    await this.client.send(dest, data);
+    await this.client.send(dest, data, {
+      msgHoldingSeconds: 3600, // hold up to 1 hour for offline recipients
+    });
+  }
+
+  /**
+   * Send a message without waiting for recipient ACK.
+   * Useful for IPFS image notifications where the data is already uploaded.
+   */
+  sendMessageNoReply(dest: string, data: string): void {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    this.client.send(dest, data, {
+      noReply: true,
+      msgHoldingSeconds: 3600,
+    });
   }
 
   private updateStatus(status: ClientStatus): void {

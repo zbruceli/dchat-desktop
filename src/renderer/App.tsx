@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/Login/LoginPage";
 import { ChatPage } from "./pages/Chat/ChatPage";
 import { ContactsPage } from "./pages/Contacts/ContactsPage";
 import { WalletPage } from "./pages/Wallet/WalletPage";
+import { SettingsPage } from "./pages/Settings/SettingsPage";
 
 type NavItem = "chat" | "contacts" | "wallet" | "settings";
 
@@ -77,7 +78,7 @@ export function App() {
       </nav>
 
       {/* Main content area */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-h-0 min-w-0">
         <PageContent activeNav={activeNav} />
       </main>
     </div>
@@ -93,7 +94,7 @@ function PageContent({ activeNav }: { activeNav: NavItem }) {
     case "wallet":
       return <WalletPage />;
     case "settings":
-      return <PlaceholderPage title="Settings" description="App configuration — coming soon" />;
+      return <SettingsPage />;
   }
 }
 

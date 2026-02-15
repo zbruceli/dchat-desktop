@@ -7,6 +7,8 @@ interface ChatState {
   setActiveSession: (sessionId: string | null) => void;
   loadMessages: (sessionId: string) => Promise<void>;
   sendMessage: (to: string, content: string) => Promise<void>;
+  sendImage: (to: string) => Promise<void>;
+  downloadImage: (messageId: string) => Promise<void>;
   startSession: (targetAddress: string) => Promise<string>;
   handleIncomingMessage: (message: Message) => void;
 }
@@ -35,6 +37,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (to: string, content: string) => {
     await window.dchat.chat.sendMessage(to, content);
+  },
+
+  sendImage: async (to: string) => {
+    try {
+      const filePath = await window.dchat.chat.pickImage();
+      if (!filePath) return;
+      await window.dchat.chat.sendImage(to, filePath);
+    } catch (err) {
+      console.error("sendImage failed:", err);
+    }
+  },
+
+  downloadImage: async (messageId: string) => {
+    await window.dchat.chat.downloadImage(messageId);
   },
 
   startSession: async (targetAddress: string) => {

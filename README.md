@@ -22,12 +22,17 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 ### Available Now
 - **NKN wallet management** — Create new wallet, import from keystore JSON, restore saved wallet
 - **1-to-1 messaging** — Send/receive encrypted text messages over NKN relay network
+- **Image messaging** — Send/receive images encrypted with AES-128-GCM, stored on IPFS, fully interoperable with nMobile
+- **IPFS integration** — Encrypted upload/download via nMobile's IPFS nodes, multi-gateway fallback, configurable in Settings
+- **Thumbnail preview** — 120x120 thumbnails uploaded separately to IPFS; receiver sees thumbnail immediately while full image downloads in background
+- **Image viewer** — Click images to open full-screen lightbox, retry failed downloads
 - **Contact management** — Add contacts by NKN address, auto-create contacts for unknown senders
 - **Conversation threads** — Session list with last message preview and unread badges
 - **Message status** — Sending/sent/failed indicators on outbound messages
 - **Persistent storage** — SQLite database for message history, contacts, sessions, and settings
 - **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
 - **Auth gate** — Login page when disconnected, full app when connected
+- **Settings page** — IPFS gateway configuration (host/port)
 - **Dark theme UI** — Tailwind CSS dark theme with chat bubbles, session list, and contact management
 - Hot-reload development environment
 
@@ -36,7 +41,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Message receipts** — Delivered and read status tracking
 - **NKN wallet UI** — Balance display, send/receive NKN tokens
 - **Group chat** — Public topics (on-chain) and private groups (signature-based)
-- **Media sharing** — Images, files, audio, video via IPFS
+- **Audio, video, file sharing** — Additional media types via IPFS
 - **Burn-after-read** — Self-destructing messages
 - **Desktop notifications** — Native OS notifications for new messages
 
@@ -57,8 +62,9 @@ cd dchat
 # Install dependencies
 npm install
 
-# Rebuild native modules (better-sqlite3) for Electron
-npx electron-rebuild
+# Rebuild native modules (better-sqlite3, sharp) for Electron
+npx electron-rebuild -f -w better-sqlite3
+npx electron-rebuild -f -w sharp
 
 # Start in development mode (hot reload)
 npm run dev
@@ -99,19 +105,22 @@ src/
 │   ├── index.ts         App entry — DB init, services, IPC registration
 │   ├── services/        Business logic
 │   │   ├── nkn-client-service.ts   NKN MultiClient wrapper
-│   │   ├── chat-service.ts         Send/receive message orchestration
+│   │   ├── chat-service.ts         Send/receive text + image orchestration
+│   │   ├── image-service.ts        Image resize, thumbnail, encrypt, IPFS upload/download
+│   │   ├── ipfs-service.ts         IPFS HTTP API upload/download, multi-gateway
 │   │   ├── contact-service.ts      Contact CRUD
 │   │   └── session-service.ts      Session CRUD
 │   ├── db/              SQLite database layer
 │   │   ├── database.ts             Singleton (init/get/close, WAL, FK)
-│   │   ├── migrations/             Version-based schema migrations
+│   │   ├── migrations/             Version-based schema migrations (001–003)
 │   │   └── repositories/           One repository per entity
 │   ├── ipc/             IPC handler registration (one file per domain)
-│   └── crypto/          Encryption utilities (planned)
+│   └── crypto/
+│       └── aes-gcm.ts             AES-128-GCM encrypt/decrypt (nMobile-compatible)
 ├── renderer/          React UI (runs in browser context)
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
-│   ├── pages/           Login, Chat (two-panel), Contacts
-│   ├── components/      Chat bubbles, session list, message input, status
+│   ├── pages/           Login, Chat (two-panel), Contacts, Settings
+│   ├── components/      Chat bubbles, image display, lightbox, session list, message input
 │   ├── stores/          Zustand stores (client, chat, contact, session)
 │   └── hooks/           IPC push-event subscriptions
 ├── shared/            Code shared between main and renderer
@@ -141,7 +150,8 @@ Context isolation is enabled and `nodeIntegration` is disabled — the renderer 
 | State management | Zustand |
 | Networking | nkn-sdk (NKN JavaScript SDK) |
 | Database | better-sqlite3 (SQLCipher planned) |
-| Crypto | Node.js crypto (AES-256-GCM planned), tweetnacl-js (planned) |
+| Crypto | Node.js crypto (AES-128-GCM, nMobile-compatible) |
+| Image Processing | sharp (resize, thumbnail generation) |
 | Bundler | Vite (renderer), tsc (main/preload) |
 | Packaging | electron-builder |
 | Testing | Vitest, Playwright |
@@ -173,7 +183,7 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 | Phase | Focus | Status |
 |---|---|---|
 | 1 | Foundation — NKN client, 1-to-1 messaging, contacts, SQLite DB | Complete |
-| 2 | Rich messaging — Receipts, media, IPFS, burn-after-read, SQLCipher encryption | Planned |
+| 2 | Rich messaging — Image messaging, IPFS, thumbnails, AES-GCM encryption | In Progress |
 | 3 | Group chat — Public topics, private groups | Planned |
 | 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | Planned |
 

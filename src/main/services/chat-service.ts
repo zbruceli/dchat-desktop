@@ -1,9 +1,15 @@
 import crypto from "crypto";
 import type { NknClientService } from "./nkn-client-service";
+import type { ImageService } from "./image-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
-import type { Message, MessageData, SendMessageParams } from "../../shared/types";
+import type {
+  Message,
+  MessageData,
+  MessageOptions,
+  SendMessageParams,
+} from "../../shared/types";
 
 // Content types that represent user-visible messages
 const DISPLAYABLE_TYPES = new Set([
@@ -17,6 +23,8 @@ const DISPLAYABLE_TYPES = new Set([
 ]);
 
 export class ChatService {
+  private imageService: ImageService | null = null;
+
   constructor(
     private nknClient: NknClientService,
     private messageRepo: MessageRepository,
@@ -66,6 +74,86 @@ export class ChatService {
     } catch (err) {
       console.error("Failed to consolidate legacy sessions:", err);
     }
+  }
+
+  setImageService(imageService: ImageService): void {
+    this.imageService = imageService;
+  }
+
+  async sendImageMessage(to: string, filePath: string): Promise<Message> {
+    if (!this.imageService) throw new Error("Image service not configured");
+
+    const now = Date.now();
+    const myAddress = this.nknClient.getStatus().address;
+    if (!myAddress) throw new Error("Not connected");
+
+    const session = this.getOrCreateSession(to, myAddress);
+    const messageId = crypto.randomUUID();
+
+    // Insert placeholder message
+    const message: Message = {
+      id: messageId,
+      sessionId: session.id,
+      sender: myAddress,
+      receiver: to,
+      contentType: "ipfs",
+      content: "",
+      status: "sending",
+      isOutbound: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.messageRepo.insert(message);
+    this.sessionRepo.updateLastMessage(session.id, "[Image]", now);
+    this.pushToRenderer("chat:onMessage", message);
+    this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
+
+    // Step 1: Upload thumbnail + full image to IPFS (await completion)
+    try {
+      const { options, localFilePath, thumbnailLocalFilePath } =
+        await this.imageService.processAndUpload(filePath);
+
+      // Update message with IPFS hash as content (nMobile convention)
+      const ipfsHash = options.ipfsHash ?? "";
+      this.messageRepo.updateContent(messageId, ipfsHash);
+      this.messageRepo.updateOptions(messageId, JSON.stringify(options));
+      this.messageRepo.updateLocalFilePath(messageId, localFilePath);
+      this.messageRepo.updateThumbnailLocalFilePath(messageId, thumbnailLocalFilePath);
+
+      message.content = ipfsHash;
+      message.options = JSON.stringify(options);
+      message.localFilePath = localFilePath;
+      message.thumbnailLocalFilePath = thumbnailLocalFilePath;
+
+      // Push updated message with local image before sending NKN notification
+      this.pushToRenderer("chat:onMessage", { ...message });
+
+      console.log(
+        `[sendImageMessage] IPFS upload OK: ipfsHash=${ipfsHash}, thumbHash=${options.ipfsThumbnailHash}, sending NKN notification...`,
+      );
+
+      // Step 2: Send NKN notification (fire-and-forget, don't wait for ACK)
+      const messageData: MessageData = {
+        id: messageId,
+        contentType: "ipfs",
+        content: ipfsHash,
+        options,
+        timestamp: now,
+      };
+
+      this.nknClient.sendMessageNoReply(to, JSON.stringify(messageData));
+      this.messageRepo.updateStatus(messageId, "sent");
+      message.status = "sent";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "sent" });
+    } catch (err) {
+      console.error("sendImageMessage failed:", err);
+      this.messageRepo.updateStatus(messageId, "failed");
+      message.status = "failed";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "failed" });
+    }
+
+    return message;
   }
 
   async sendMessage(params: SendMessageParams): Promise<Message> {
@@ -129,8 +217,11 @@ export class ChatService {
       return;
     }
 
-    // Skip messages with no ID or empty content
-    if (!messageData.id || !messageData.content?.trim()) {
+    // Skip messages with no ID; allow empty content for IPFS messages
+    if (!messageData.id) {
+      return;
+    }
+    if (contentType !== "ipfs" && !messageData.content?.trim()) {
       return;
     }
 
@@ -157,6 +248,13 @@ export class ChatService {
 
     const now = Date.now();
     const content = messageData.content ?? "";
+    const optionsJson = messageData.options
+      ? JSON.stringify(messageData.options)
+      : undefined;
+
+    const isIpfs = contentType === "ipfs";
+    const sessionPreview = isIpfs ? "[Image]" : content;
+
     const message: Message = {
       id: messageData.id,
       sessionId: session.id,
@@ -166,16 +264,151 @@ export class ChatService {
       content,
       status: "delivered",
       isOutbound: false,
+      options: optionsJson,
       createdAt: messageData.timestamp ?? now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
-    this.sessionRepo.updateLastMessage(session.id, content, messageData.timestamp ?? now);
+    this.sessionRepo.updateLastMessage(
+      session.id,
+      sessionPreview,
+      messageData.timestamp ?? now,
+    );
     this.sessionRepo.incrementUnread(session.id);
 
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
+
+    // Background download for IPFS images
+    // nMobile may send ipfsHash in options, or the IPFS CID as content
+    const hasIpfsData =
+      messageData.options?.ipfsHash ||
+      (isIpfs && content && content.startsWith("Qm"));
+    if (isIpfs && this.imageService && hasIpfsData) {
+      const opts = messageData.options ?? {};
+      if (!opts.ipfsHash && content) {
+        opts.ipfsHash = content;
+      }
+      // Download thumbnail first for quick preview, then full image in background
+      this.downloadIpfsThumbnailThenFull(message, opts);
+    }
+  }
+
+  private async downloadIpfsImage(
+    message: Message,
+    opts: MessageOptions,
+    retries = 3,
+  ): Promise<void> {
+    // Get IPFS hash from options or from message content
+    const ipfsHash = opts.ipfsHash || message.content;
+    if (!this.imageService || !ipfsHash) return;
+
+    // nMobile sends key as byte array; default to empty if missing
+    const keyBytes = opts.ipfsEncryptKeyBytes ?? [];
+    const nonceSize = opts.ipfsEncryptNonceSize ?? 12;
+    const fileExt = opts.fileExt ?? "jpg";
+
+    const preferredIp = opts.ipfsIp;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const localFilePath = await this.imageService.downloadAndDecrypt(
+          ipfsHash,
+          keyBytes,
+          nonceSize,
+          fileExt,
+          preferredIp,
+        );
+        this.messageRepo.updateLocalFilePath(message.id, localFilePath);
+        this.pushToRenderer("chat:onMessage", {
+          ...message,
+          localFilePath,
+        });
+        return;
+      } catch (err) {
+        console.error(
+          `IPFS download attempt ${attempt}/${retries} failed for ${opts.ipfsHash}:`,
+          err,
+        );
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    // All retries exhausted — persist failure marker and push to renderer
+    this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+    this.pushToRenderer("chat:onMessage", {
+      ...message,
+      localFilePath: "__download_failed__",
+    });
+  }
+
+  /**
+   * Download thumbnail first for quick preview, then full image in background.
+   * Follows nMobile convention: thumbnail and full image are separate IPFS uploads.
+   */
+  private async downloadIpfsThumbnailThenFull(
+    message: Message,
+    opts: MessageOptions,
+  ): Promise<void> {
+    // Step 1: Download thumbnail if available (fast, small file)
+    const thumbHash = opts.ipfsThumbnailHash;
+    const thumbKeyBytes = opts.ipfsThumbnailEncryptKeyBytes;
+    const thumbNonceSize = opts.ipfsThumbnailEncryptNonceSize ?? 12;
+    const preferredIp = opts.ipfsThumbnailIp || opts.ipfsIp;
+
+    if (thumbHash && thumbKeyBytes && thumbKeyBytes.length > 0 && this.imageService) {
+      try {
+        const thumbPath = await this.imageService.downloadAndDecrypt(
+          thumbHash,
+          thumbKeyBytes,
+          thumbNonceSize,
+          opts.fileExt ?? "jpg",
+          preferredIp,
+        );
+        this.messageRepo.updateThumbnailLocalFilePath(message.id, thumbPath);
+        this.pushToRenderer("chat:onMessage", {
+          ...message,
+          thumbnailLocalFilePath: thumbPath,
+        });
+        // Update message object for subsequent full-image push
+        message.thumbnailLocalFilePath = thumbPath;
+      } catch (err) {
+        console.error(`Thumbnail download failed for ${thumbHash}:`, err);
+        // Continue to full image download even if thumbnail fails
+      }
+    }
+
+    // Step 2: Download full image in background
+    await this.downloadIpfsImage(message, opts);
+  }
+
+  async retryImageDownload(messageId: string): Promise<void> {
+    const msg = this.messageRepo.findById(messageId);
+    if (!msg || msg.contentType !== "ipfs" || !msg.options) return;
+
+    let opts: MessageOptions;
+    try {
+      opts = JSON.parse(msg.options);
+    } catch {
+      return;
+    }
+
+    if (!opts.ipfsHash) return;
+
+    // Clear the failure marker
+    this.messageRepo.updateLocalFilePath(messageId, "");
+    const updatedMsg = this.messageRepo.findById(messageId);
+    if (updatedMsg) {
+      // Push "downloading" state (localFilePath cleared)
+      this.pushToRenderer("chat:onMessage", {
+        ...updatedMsg,
+        localFilePath: undefined,
+      });
+      await this.downloadIpfsImage(updatedMsg, opts, 3);
+    }
   }
 
   startSession(targetAddress: string): { sessionId: string } {

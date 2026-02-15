@@ -1,12 +1,18 @@
 import type Database from "better-sqlite3";
 import { up as migration001 } from "./001-initial-schema";
+import { up as migration002 } from "./002-add-message-options";
+import { up as migration003 } from "./003-add-thumbnail-path";
 
 interface Migration {
   version: number;
   up: (db: Database.Database) => void;
 }
 
-const migrations: Migration[] = [{ version: 1, up: migration001 }];
+const migrations: Migration[] = [
+  { version: 1, up: migration001 },
+  { version: 2, up: migration002 },
+  { version: 3, up: migration003 },
+];
 
 export function runMigrations(db: Database.Database): void {
   const currentVersion = db.pragma("user_version", { simple: true }) as number;

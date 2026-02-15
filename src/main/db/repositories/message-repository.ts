@@ -11,6 +11,9 @@ interface MessageRow {
   status: string;
   is_outbound: number;
   nkn_message_id: string | null;
+  options: string | null;
+  local_file_path: string | null;
+  thumbnail_local_file_path: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -26,6 +29,9 @@ function rowToMessage(row: MessageRow): Message {
     status: row.status as MessageStatus,
     isOutbound: row.is_outbound === 1,
     nknMessageId: row.nkn_message_id ?? undefined,
+    options: row.options ?? undefined,
+    localFilePath: row.local_file_path ?? undefined,
+    thumbnailLocalFilePath: row.thumbnail_local_file_path ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -41,8 +47,8 @@ export class MessageRepository {
   insert(message: Message): void {
     this.db
       .prepare(
-        `INSERT INTO message (id, session_id, sender, receiver, content_type, content, status, is_outbound, nkn_message_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO message (id, session_id, sender, receiver, content_type, content, status, is_outbound, nkn_message_id, options, local_file_path, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         message.id,
@@ -54,6 +60,8 @@ export class MessageRepository {
         message.status,
         message.isOutbound ? 1 : 0,
         message.nknMessageId ?? null,
+        message.options ?? null,
+        message.localFilePath ?? null,
         message.createdAt,
         message.updatedAt,
       );
@@ -92,6 +100,30 @@ export class MessageRepository {
     this.db
       .prepare(`UPDATE message SET session_id = ?, updated_at = ? WHERE session_id = ?`)
       .run(newSessionId, Date.now(), oldSessionId);
+  }
+
+  updateLocalFilePath(id: string, localFilePath: string): void {
+    this.db
+      .prepare(`UPDATE message SET local_file_path = ?, updated_at = ? WHERE id = ?`)
+      .run(localFilePath, Date.now(), id);
+  }
+
+  updateThumbnailLocalFilePath(id: string, thumbnailPath: string): void {
+    this.db
+      .prepare(`UPDATE message SET thumbnail_local_file_path = ?, updated_at = ? WHERE id = ?`)
+      .run(thumbnailPath, Date.now(), id);
+  }
+
+  updateOptions(id: string, optionsJson: string): void {
+    this.db
+      .prepare(`UPDATE message SET options = ?, updated_at = ? WHERE id = ?`)
+      .run(optionsJson, Date.now(), id);
+  }
+
+  updateContent(id: string, content: string): void {
+    this.db
+      .prepare(`UPDATE message SET content = ?, updated_at = ? WHERE id = ?`)
+      .run(content, Date.now(), id);
   }
 
   deleteBySessionId(sessionId: string): void {

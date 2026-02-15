@@ -2,8 +2,10 @@ export type {
   Message,
   MessageData,
   MessageContentType,
+  MessageOptions,
   MessageStatus,
   SendMessageParams,
+  SendImageParams,
 } from "./message";
 
 export type { Contact, AddContactParams } from "./contact";

@@ -2,10 +2,11 @@ import React, { useState, useRef } from "react";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
+  onSendImage?: () => void;
   disabled?: boolean;
 }
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, onSendImage, disabled }: MessageInputProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -36,6 +37,23 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
   return (
     <div className="flex items-end gap-2 p-3 border-t border-gray-800">
+      {onSendImage && (
+        <button
+          onClick={onSendImage}
+          disabled={disabled}
+          className="p-2 text-gray-400 hover:text-gray-200 disabled:opacity-40 transition-colors flex-shrink-0"
+          title="Send image"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+        </button>
+      )}
       <textarea
         ref={textareaRef}
         value={text}
