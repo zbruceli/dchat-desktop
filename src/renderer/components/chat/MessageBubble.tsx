@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { ImageModal } from "./ImageModal";
+import { AudioContent } from "./AudioContent";
 
 interface MessageBubbleProps {
   message: Message;
@@ -151,7 +152,12 @@ function ImageContent({ message }: { message: Message }) {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
-  const isIpfsImage = message.contentType === "ipfs";
+  const opts = parseOptions(message);
+  const isAudio = message.contentType === "audio";
+  const isIpfsAudio =
+    message.contentType === "ipfs" &&
+    (opts?.fileType === 2 || opts?.fileType === "2");
+  const isIpfsImage = message.contentType === "ipfs" && !isIpfsAudio;
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -177,7 +183,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-gray-800 text-gray-200 rounded-bl-md"
         }`}
       >
-        {isIpfsImage ? (
+        {isAudio || isIpfsAudio ? (
+          <AudioContent message={message} />
+        ) : isIpfsImage ? (
           <ImageContent message={message} />
         ) : (
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>

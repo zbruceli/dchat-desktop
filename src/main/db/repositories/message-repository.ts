@@ -126,6 +126,12 @@ export class MessageRepository {
       .run(content, Date.now(), id);
   }
 
+  updateContentType(id: string, contentType: string): void {
+    this.db
+      .prepare(`UPDATE message SET content_type = ?, updated_at = ? WHERE id = ?`)
+      .run(contentType, Date.now(), id);
+  }
+
   deleteBySessionId(sessionId: string): void {
     this.db.prepare(`DELETE FROM message WHERE session_id = ?`).run(sessionId);
   }

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { NknClientService } from "./nkn-client-service";
 import type { ImageService } from "./image-service";
+import type { AudioService } from "./audio-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
@@ -24,6 +25,7 @@ const DISPLAYABLE_TYPES = new Set([
 
 export class ChatService {
   private imageService: ImageService | null = null;
+  private audioService: AudioService | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -78,6 +80,10 @@ export class ChatService {
 
   setImageService(imageService: ImageService): void {
     this.imageService = imageService;
+  }
+
+  setAudioService(audioService: AudioService): void {
+    this.audioService = audioService;
   }
 
   async sendImageMessage(to: string, filePath: string): Promise<Message> {
@@ -156,6 +162,78 @@ export class ChatService {
     return message;
   }
 
+  async sendAudioMessage(
+    to: string,
+    audioBuffer: Buffer,
+    durationSeconds: number,
+  ): Promise<Message> {
+    if (!this.audioService) throw new Error("Audio service not configured");
+
+    const now = Date.now();
+    const myAddress = this.nknClient.getStatus().address;
+    if (!myAddress) throw new Error("Not connected");
+
+    const session = this.getOrCreateSession(to, myAddress);
+    const messageId = crypto.randomUUID();
+
+    // Insert placeholder message
+    const message: Message = {
+      id: messageId,
+      sessionId: session.id,
+      sender: myAddress,
+      receiver: to,
+      contentType: "audio",
+      content: "",
+      status: "sending",
+      isOutbound: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.messageRepo.insert(message);
+    this.sessionRepo.updateLastMessage(session.id, "[Voice Message]", now);
+    this.pushToRenderer("chat:onMessage", message);
+    this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
+
+    try {
+      const result = await this.audioService.processAndUpload(audioBuffer, durationSeconds);
+
+      // Update message in DB with actual content
+      this.messageRepo.updateContent(messageId, result.content);
+      this.messageRepo.updateOptions(messageId, JSON.stringify(result.options));
+      this.messageRepo.updateLocalFilePath(messageId, result.localFilePath);
+
+      message.content = result.content;
+      message.options = JSON.stringify(result.options);
+      message.localFilePath = result.localFilePath;
+
+      // Push updated message with local file before sending NKN notification
+      this.pushToRenderer("chat:onMessage", { ...message });
+
+      // Build NKN message data and send inline with ACK
+      const messageData: MessageData = {
+        id: messageId,
+        contentType: "audio",
+        content: result.content,
+        options: result.options,
+        timestamp: now,
+      };
+
+      this.nknClient.sendMessageNoReply(to, JSON.stringify(messageData));
+
+      this.messageRepo.updateStatus(messageId, "sent");
+      message.status = "sent";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "sent" });
+    } catch (err) {
+      console.error("sendAudioMessage failed:", err);
+      this.messageRepo.updateStatus(messageId, "failed");
+      message.status = "failed";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "failed" });
+    }
+
+    return message;
+  }
+
   async sendMessage(params: SendMessageParams): Promise<Message> {
     const now = Date.now();
     const myAddress = this.nknClient.getStatus().address;
@@ -221,7 +299,7 @@ export class ChatService {
     if (!messageData.id) {
       return;
     }
-    if (contentType !== "ipfs" && !messageData.content?.trim()) {
+    if (contentType !== "ipfs" && contentType !== "audio" && !messageData.content?.trim()) {
       return;
     }
 
@@ -253,7 +331,14 @@ export class ChatService {
       : undefined;
 
     const isIpfs = contentType === "ipfs";
-    const sessionPreview = isIpfs ? "[Image]" : content;
+    const isAudio = contentType === "audio";
+    const fileType = messageData.options?.fileType;
+    const isIpfsAudio = isIpfs && (fileType === 2 || fileType === "2");
+    const sessionPreview = isAudio || isIpfsAudio
+      ? "[Voice Message]"
+      : isIpfs
+        ? "[Image]"
+        : content;
 
     const message: Message = {
       id: messageData.id,
@@ -280,18 +365,37 @@ export class ChatService {
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
 
-    // Background download for IPFS images
+    // Handle inline audio (contentType "audio" with base64 content)
+    if (isAudio && this.audioService && content) {
+      const opts = messageData.options ?? {};
+      const fileExt = (opts.fileExt as string) ?? "aac";
+      const localFilePath = this.audioService.saveInlineAudio(
+        messageData.id,
+        content,
+        fileExt,
+      );
+      this.messageRepo.updateLocalFilePath(messageData.id, localFilePath);
+      this.pushToRenderer("chat:onMessage", { ...message, localFilePath });
+    }
+
+    // Background download for IPFS content
     // nMobile may send ipfsHash in options, or the IPFS CID as content
     const hasIpfsData =
       messageData.options?.ipfsHash ||
       (isIpfs && content && content.startsWith("Qm"));
-    if (isIpfs && this.imageService && hasIpfsData) {
+    if (isIpfs && hasIpfsData) {
       const opts = messageData.options ?? {};
       if (!opts.ipfsHash && content) {
         opts.ipfsHash = content;
       }
-      // Download thumbnail first for quick preview, then full image in background
-      this.downloadIpfsThumbnailThenFull(message, opts);
+
+      if (isIpfsAudio && this.audioService) {
+        // IPFS audio download
+        this.downloadIpfsAudio(message, opts);
+      } else if (this.imageService) {
+        // IPFS image download (thumbnail first, then full)
+        this.downloadIpfsThumbnailThenFull(message, opts);
+      }
     }
   }
 
@@ -345,6 +449,50 @@ export class ChatService {
     });
   }
 
+  private async downloadIpfsAudio(
+    message: Message,
+    opts: MessageOptions,
+    retries = 3,
+  ): Promise<void> {
+    const ipfsHash = opts.ipfsHash || message.content;
+    if (!this.audioService || !ipfsHash) return;
+
+    const keyBytes = opts.ipfsEncryptKeyBytes ?? [];
+    const nonceSize = opts.ipfsEncryptNonceSize ?? 12;
+    const fileExt = (opts.fileExt as string) ?? "aac";
+    const preferredIp = opts.ipfsIp;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const localFilePath = await this.audioService.downloadAndDecrypt(
+          ipfsHash,
+          keyBytes,
+          nonceSize,
+          fileExt,
+          preferredIp,
+        );
+        this.messageRepo.updateLocalFilePath(message.id, localFilePath);
+        this.pushToRenderer("chat:onMessage", { ...message, localFilePath });
+        return;
+      } catch (err) {
+        console.error(
+          `IPFS audio download attempt ${attempt}/${retries} failed for ${ipfsHash}:`,
+          err,
+        );
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    // All retries exhausted
+    this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+    this.pushToRenderer("chat:onMessage", {
+      ...message,
+      localFilePath: "__download_failed__",
+    });
+  }
+
   /**
    * Download thumbnail first for quick preview, then full image in background.
    * Follows nMobile convention: thumbnail and full image are separate IPFS uploads.
@@ -383,6 +531,52 @@ export class ChatService {
 
     // Step 2: Download full image in background
     await this.downloadIpfsImage(message, opts);
+  }
+
+  async retryAudioDownload(messageId: string): Promise<void> {
+    const msg = this.messageRepo.findById(messageId);
+    if (!msg) return;
+
+    // Case 1: Inline audio (contentType "audio" with base64/data-URI content)
+    if (msg.contentType === "audio" && msg.content && this.audioService) {
+      const opts = msg.options ? JSON.parse(msg.options) : {};
+      const fileExt = (opts.fileExt as string) ?? "aac";
+      const localFilePath = this.audioService.saveInlineAudio(
+        msg.id,
+        msg.content,
+        fileExt,
+      );
+      this.messageRepo.updateLocalFilePath(messageId, localFilePath);
+      this.pushToRenderer("chat:onMessage", { ...msg, localFilePath });
+      return;
+    }
+
+    // Case 2: IPFS audio (contentType "ipfs" with fileType 2, or "audio" with ipfsHash)
+    if (!msg.options) return;
+    let opts: MessageOptions;
+    try {
+      opts = JSON.parse(msg.options);
+    } catch {
+      return;
+    }
+
+    const isIpfsAudio =
+      msg.contentType === "ipfs" &&
+      (opts.fileType === 2 || opts.fileType === "2");
+    const isAudioWithIpfs = msg.contentType === "audio" && opts.ipfsHash;
+    if (!isIpfsAudio && !isAudioWithIpfs) return;
+    if (!opts.ipfsHash) return;
+
+    // Clear the failure marker
+    this.messageRepo.updateLocalFilePath(messageId, "");
+    const updatedMsg = this.messageRepo.findById(messageId);
+    if (updatedMsg) {
+      this.pushToRenderer("chat:onMessage", {
+        ...updatedMsg,
+        localFilePath: undefined,
+      });
+      await this.downloadIpfsAudio(updatedMsg, opts, 3);
+    }
   }
 
   async retryImageDownload(messageId: string): Promise<void> {

@@ -1,12 +1,14 @@
 import React, { useState, useRef } from "react";
+import { VoiceRecordButton } from "./VoiceRecordButton";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
   onSendImage?: () => void;
+  onSendAudio?: (audioBuffer: ArrayBuffer, durationSeconds: number) => void;
   disabled?: boolean;
 }
 
-export function MessageInput({ onSend, onSendImage, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, onSendImage, onSendAudio, disabled }: MessageInputProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -53,6 +55,12 @@ export function MessageInput({ onSend, onSendImage, disabled }: MessageInputProp
             />
           </svg>
         </button>
+      )}
+      {onSendAudio && (
+        <VoiceRecordButton
+          onRecordComplete={onSendAudio}
+          disabled={disabled}
+        />
       )}
       <textarea
         ref={textareaRef}

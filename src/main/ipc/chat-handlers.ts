@@ -19,6 +19,17 @@ export function registerChatHandlers(chatService: ChatService): void {
     },
   );
 
+  ipcMain.handle(
+    IPC.CHAT.SEND_AUDIO,
+    async (_event, to: string, audioArrayBuffer: ArrayBuffer, durationSeconds: number) => {
+      return await chatService.sendAudioMessage(
+        to,
+        Buffer.from(audioArrayBuffer),
+        durationSeconds,
+      );
+    },
+  );
+
   ipcMain.handle(IPC.CHAT.PICK_IMAGE, async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
@@ -34,6 +45,13 @@ export function registerChatHandlers(chatService: ChatService): void {
     IPC.CHAT.DOWNLOAD_IMAGE,
     async (_event, messageId: string) => {
       await chatService.retryImageDownload(messageId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.CHAT.DOWNLOAD_AUDIO,
+    async (_event, messageId: string) => {
+      await chatService.retryAudioDownload(messageId);
     },
   );
 

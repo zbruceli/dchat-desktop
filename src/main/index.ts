@@ -11,6 +11,7 @@ import { ContactService } from "./services/contact-service";
 import { SessionService } from "./services/session-service";
 import { IpfsService } from "./services/ipfs-service";
 import { ImageService } from "./services/image-service";
+import { AudioService } from "./services/audio-service";
 import { registerAllHandlers } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
@@ -90,12 +91,43 @@ app.whenReady().then(() => {
     }
   }
 
+  // MIME type map for media files served via dchat-media://
+  const MIME_TYPES: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".aac": "audio/aac",
+    ".mp3": "audio/mpeg",
+    ".ogg": "audio/ogg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+  };
+
   // Register dchat-media:// protocol handler
-  protocol.handle("dchat-media", (request) => {
+  protocol.handle("dchat-media", async (request) => {
     const url = new URL(request.url);
     // dchat-media://image-cache/filename → {userData}/image-cache/filename
+    // dchat-media://audio-cache/filename → {userData}/audio-cache/filename
     const filePath = path.join(userDataPath, url.hostname, url.pathname);
-    // Use pathToFileURL to properly encode spaces and special characters in the path
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeType = MIME_TYPES[ext];
+
+    if (mimeType) {
+      // Read file and return with explicit Content-Type for reliable playback
+      const fs = await import("fs");
+      try {
+        const data = fs.readFileSync(filePath);
+        return new Response(data, {
+          headers: { "Content-Type": mimeType },
+        });
+      } catch {
+        return new Response("Not found", { status: 404 });
+      }
+    }
+
+    // Fallback for unknown types
     return net.fetch(pathToFileURL(filePath).href);
   });
 
@@ -116,7 +148,9 @@ app.whenReady().then(() => {
     contactRepo,
     pushToRenderer,
   );
+  const audioService = new AudioService(ipfsService, userDataPath);
   chatService.setImageService(imageService);
+  chatService.setAudioService(audioService);
   const contactService = new ContactService(contactRepo);
   const sessionService = new SessionService(sessionRepo);
 

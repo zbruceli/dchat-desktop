@@ -9,6 +9,7 @@ export function MessageThread() {
   const messagesBySession = useChatStore((s) => s.messagesBySession);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const sendImage = useChatStore((s) => s.sendImage);
+  const sendAudio = useChatStore((s) => s.sendAudio);
   const sessions = useSessionStore((s) => s.sessions);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,12 @@ export function MessageThread() {
   function handleSendImage() {
     if (session) {
       sendImage(session.targetAddress);
+    }
+  }
+
+  function handleSendAudio(audioBuffer: ArrayBuffer, durationSeconds: number) {
+    if (session) {
+      sendAudio(session.targetAddress, audioBuffer, durationSeconds);
     }
   }
 
@@ -72,7 +79,7 @@ export function MessageThread() {
       </div>
 
       {/* Input */}
-      <MessageInput onSend={handleSend} onSendImage={handleSendImage} />
+      <MessageInput onSend={handleSend} onSendImage={handleSendImage} onSendAudio={handleSendAudio} />
     </div>
   );
 }

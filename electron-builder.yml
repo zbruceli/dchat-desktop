@@ -6,8 +6,12 @@ directories:
 files:
   - dist/**/*
   - package.json
+asarUnpack:
+  - "node_modules/@ffmpeg-installer/**"
 mac:
   category: public.app-category.social-networking
+  extendInfo:
+    NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
   target:
     - dmg
     - zip

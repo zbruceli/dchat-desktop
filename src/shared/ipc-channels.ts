@@ -11,6 +11,8 @@ export const IPC = {
   CHAT: {
     SEND_MESSAGE: "chat:sendMessage",
     SEND_IMAGE: "chat:sendImage",
+    SEND_AUDIO: "chat:sendAudio",
+    DOWNLOAD_AUDIO: "chat:downloadAudio",
     PICK_IMAGE: "chat:pickImage",
     DOWNLOAD_IMAGE: "chat:downloadImage",
     GET_MESSAGES: "chat:getMessages",

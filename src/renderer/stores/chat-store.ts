@@ -8,7 +8,9 @@ interface ChatState {
   loadMessages: (sessionId: string) => Promise<void>;
   sendMessage: (to: string, content: string) => Promise<void>;
   sendImage: (to: string) => Promise<void>;
+  sendAudio: (to: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
   downloadImage: (messageId: string) => Promise<void>;
+  downloadAudio: (messageId: string) => Promise<void>;
   startSession: (targetAddress: string) => Promise<string>;
   handleIncomingMessage: (message: Message) => void;
 }
@@ -49,8 +51,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  sendAudio: async (to: string, audioBuffer: ArrayBuffer, durationSeconds: number) => {
+    try {
+      await window.dchat.chat.sendAudio(to, audioBuffer, durationSeconds);
+    } catch (err) {
+      console.error("sendAudio failed:", err);
+    }
+  },
+
   downloadImage: async (messageId: string) => {
     await window.dchat.chat.downloadImage(messageId);
+  },
+
+  downloadAudio: async (messageId: string) => {
+    await window.dchat.chat.downloadAudio(messageId);
   },
 
   startSession: async (targetAddress: string) => {

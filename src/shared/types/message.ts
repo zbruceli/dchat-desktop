@@ -42,6 +42,7 @@ export interface MessageOptions {
   fileSize?: number;
   mediaWidth?: number;
   mediaHeight?: number;
+  mediaDuration?: number; // duration in seconds (float), used for audio/video
 }
 
 export interface MessageData {
