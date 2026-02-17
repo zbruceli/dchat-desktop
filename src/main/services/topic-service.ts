@@ -203,10 +203,10 @@ export class TopicService {
       updatedAt: now,
     };
 
-    this.messageRepo.insert(message);
-
-    // Ensure topic session exists
+    // Ensure topic session exists before inserting message (FK constraint)
     this.getOrCreateTopicSession(topicName);
+
+    this.messageRepo.insert(message);
     this.sessionRepo.updateLastMessage(sessionId, content, now);
 
     this.pushToRenderer("chat:onMessage", message);

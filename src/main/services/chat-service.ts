@@ -54,6 +54,8 @@ export class ChatService {
       const byTarget = new Map<string, typeof allSessions>();
 
       for (const session of allSessions) {
+        // Skip topic sessions — they use their own ID scheme (topic:{name})
+        if (session.type === "topic") continue;
         const existing = byTarget.get(session.targetAddress) ?? [];
         existing.push(session);
         byTarget.set(session.targetAddress, existing);

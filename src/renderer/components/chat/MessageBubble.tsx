@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
+import { useContactStore } from "../../stores/contact-store";
 import { ImageModal } from "./ImageModal";
 import { AudioContent } from "./AudioContent";
 import { FileContent } from "./FileContent";
@@ -160,6 +161,7 @@ function truncateAddress(addr: string): string {
 
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
+  const contacts = useContactStore((s) => s.contacts);
   const opts = parseOptions(message);
   const isAudio = message.contentType === "audio";
   const isIpfsAudio =
@@ -198,7 +200,12 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
       >
         {showSender && !isOutbound && (
           <div className="text-[10px] text-primary-400 font-medium mb-0.5 truncate">
-            {truncateAddress(message.sender)}
+            {(() => {
+              const contact = contacts.find((c) => c.address === message.sender);
+              return contact?.name && !contact.name.endsWith("...")
+                ? contact.name
+                : truncateAddress(message.sender);
+            })()}
           </div>
         )}
         {isAudio || isIpfsAudio ? (
