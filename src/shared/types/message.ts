@@ -11,7 +11,9 @@ export type MessageContentType =
   | "contact"
   | "contactOptions"
   | "deviceInfo"
-  | "deviceRequest";
+  | "deviceRequest"
+  | "topic:subscribe"
+  | "topic:unsubscribe";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 
@@ -51,6 +53,7 @@ export interface MessageData {
   contentType: MessageContentType;
   content?: string;
   options?: MessageOptions;
+  topic?: string;
   timestamp: number;
 }
 

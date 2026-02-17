@@ -13,6 +13,9 @@ import { IpfsService } from "./services/ipfs-service";
 import { ImageService } from "./services/image-service";
 import { AudioService } from "./services/audio-service";
 import { FileService } from "./services/file-service";
+import { TopicService } from "./services/topic-service";
+import { TopicRepository } from "./db/repositories/topic-repository";
+import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
 import { registerAllHandlers } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
@@ -72,6 +75,8 @@ app.whenReady().then(() => {
   const messageRepo = new MessageRepository(db);
   const contactRepo = new ContactRepository(db);
   const sessionRepo = new SessionRepository(db);
+  const topicRepo = new TopicRepository(db);
+  const subscriberRepo = new TopicSubscriberRepository(db);
 
   // 3. Create IPFS + Image services
   const ipfsService = new IpfsService();
@@ -161,11 +166,23 @@ app.whenReady().then(() => {
   chatService.setImageService(imageService);
   chatService.setAudioService(audioService);
   chatService.setFileService(fileService);
+
+  const topicService = new TopicService(
+    nknClient,
+    topicRepo,
+    subscriberRepo,
+    messageRepo,
+    sessionRepo,
+    contactRepo,
+    pushToRenderer,
+  );
+  chatService.setTopicService(topicService);
+
   const contactService = new ContactService(contactRepo);
   const sessionService = new SessionService(sessionRepo);
 
   // 7. Register IPC handlers
-  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService });
+  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService });
 
   // App info handler
   ipcMain.handle(IPC.APP.GET_INFO, () => ({

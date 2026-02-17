@@ -7,6 +7,7 @@ import { FileContent } from "./FileContent";
 
 interface MessageBubbleProps {
   message: Message;
+  showSender?: boolean;
 }
 
 function parseOptions(message: Message): MessageOptions | null {
@@ -151,7 +152,13 @@ function ImageContent({ message }: { message: Message }) {
   );
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+/** Truncate an NKN address for display */
+function truncateAddress(addr: string): string {
+  if (addr.length <= 16) return addr;
+  return addr.substring(0, 8) + "..." + addr.substring(addr.length - 6);
+}
+
+export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
   const opts = parseOptions(message);
   const isAudio = message.contentType === "audio";
@@ -189,6 +196,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-gray-800 text-gray-200 rounded-bl-md"
         }`}
       >
+        {showSender && !isOutbound && (
+          <div className="text-[10px] text-primary-400 font-medium mb-0.5 truncate">
+            {truncateAddress(message.sender)}
+          </div>
+        )}
         {isAudio || isIpfsAudio ? (
           <AudioContent message={message} />
         ) : isIpfsFile ? (

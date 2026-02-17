@@ -21,6 +21,7 @@ export function SessionList() {
     <div className="flex-1 overflow-y-auto">
       {sessions.map((session) => {
         const isActive = session.id === activeSessionId;
+        const isTopic = session.type === "topic";
         const preview = session.lastMessageContent || "No messages yet";
         const time = session.lastMessageAt
           ? new Date(session.lastMessageAt).toLocaleTimeString([], {
@@ -37,9 +38,11 @@ export function SessionList() {
               isActive ? "bg-gray-800" : "hover:bg-gray-800/50"
             }`}
           >
-            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm text-gray-300">
-                {session.targetName.charAt(0).toUpperCase()}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              isTopic ? "bg-primary-900" : "bg-gray-700"
+            }`}>
+              <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : "text-gray-300"}`}>
+                {isTopic ? "#" : session.targetName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">

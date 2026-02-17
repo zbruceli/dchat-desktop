@@ -5,6 +5,8 @@ import type {
   Session,
   WalletInfo,
   ClientStatus,
+  Topic,
+  TopicSubscriber,
 } from "../shared/types";
 
 const api = {
@@ -99,12 +101,48 @@ const api = {
       ipcRenderer.on("session:onUpdate", handler);
       return () => ipcRenderer.removeListener("session:onUpdate", handler);
     },
+    onDelete: (callback: (sessionId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string) =>
+        callback(sessionId);
+      ipcRenderer.on("session:onDelete", handler);
+      return () => ipcRenderer.removeListener("session:onDelete", handler);
+    },
   },
   settings: {
     get: (key: string): Promise<unknown> =>
       ipcRenderer.invoke("settings:get", key),
     set: (key: string, value: unknown): Promise<void> =>
       ipcRenderer.invoke("settings:set", key, value),
+  },
+  topic: {
+    create: (name: string): Promise<Topic> =>
+      ipcRenderer.invoke("topic:create", name),
+    join: (name: string): Promise<Topic> =>
+      ipcRenderer.invoke("topic:join", name),
+    leave: (name: string): Promise<void> =>
+      ipcRenderer.invoke("topic:leave", name),
+    list: (): Promise<Topic[]> =>
+      ipcRenderer.invoke("topic:list"),
+    get: (name: string): Promise<Topic | null> =>
+      ipcRenderer.invoke("topic:get", name),
+    getSubscribers: (name: string): Promise<TopicSubscriber[]> =>
+      ipcRenderer.invoke("topic:getSubscribers", name),
+    refreshSubscribers: (name: string): Promise<string[]> =>
+      ipcRenderer.invoke("topic:refreshSubscribers", name),
+    sendMessage: (name: string, content: string, contentType?: string): Promise<Message> =>
+      ipcRenderer.invoke("topic:sendMessage", name, content, contentType),
+    onUpdate: (callback: (topic: Topic) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, topic: Topic) =>
+        callback(topic);
+      ipcRenderer.on("topic:onUpdate", handler);
+      return () => ipcRenderer.removeListener("topic:onUpdate", handler);
+    },
+    onDelete: (callback: (topicId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, topicId: string) =>
+        callback(topicId);
+      ipcRenderer.on("topic:onDelete", handler);
+      return () => ipcRenderer.removeListener("topic:onDelete", handler);
+    },
   },
 };
 

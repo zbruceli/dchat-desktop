@@ -3,6 +3,7 @@ import type { NknClientService } from "./nkn-client-service";
 import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
 import type { FileService } from "./file-service";
+import type { TopicService } from "./topic-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
@@ -24,10 +25,14 @@ const DISPLAYABLE_TYPES = new Set([
   "ipfs",
 ]);
 
+// Content types for topic control messages
+const TOPIC_CONTROL_TYPES = new Set(["topic:subscribe", "topic:unsubscribe"]);
+
 export class ChatService {
   private imageService: ImageService | null = null;
   private audioService: AudioService | null = null;
   private fileService: FileService | null = null;
+  private topicService: TopicService | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -90,6 +95,10 @@ export class ChatService {
 
   setFileService(fileService: FileService): void {
     this.fileService = fileService;
+  }
+
+  setTopicService(topicService: TopicService): void {
+    this.topicService = topicService;
   }
 
   async sendImageMessage(to: string, filePath: string): Promise<Message> {
@@ -358,8 +367,23 @@ export class ChatService {
       return; // ignore malformed messages
     }
 
-    // Skip non-displayable message types (ping, receipt, contact, device:*, read, etc.)
     const contentType = messageData.contentType ?? "text";
+
+    // Route topic control messages (subscribe/unsubscribe notifications)
+    if (TOPIC_CONTROL_TYPES.has(contentType) && this.topicService) {
+      this.topicService.handleIncomingTopicControl(src, messageData);
+      return;
+    }
+
+    // Route topic messages (messages with a topic field)
+    if (messageData.topic && this.topicService) {
+      if (DISPLAYABLE_TYPES.has(contentType)) {
+        this.topicService.handleIncomingTopicMessage(src, messageData);
+      }
+      return;
+    }
+
+    // Skip non-displayable message types (ping, receipt, contact, device:*, read, etc.)
     if (!DISPLAYABLE_TYPES.has(contentType)) {
       return;
     }

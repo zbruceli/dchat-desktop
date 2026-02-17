@@ -100,6 +100,101 @@ export class NknClientService extends EventEmitter {
     });
   }
 
+  /**
+   * Send to multiple destinations (used for topic messages).
+   * Fire-and-forget — does not wait for ACK from any recipient.
+   */
+  sendToMultiple(dests: string[], data: string): void {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    if (dests.length === 0) return;
+    this.client.send(dests, data, {
+      noReply: true,
+      msgHoldingSeconds: 3600,
+    });
+  }
+
+  async subscribe(
+    topic: string,
+    duration = 400000,
+    fee = "0",
+  ): Promise<string> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    const txnHash = await this.client.subscribe(topic, duration, "", "", {
+      fee,
+      attrs: undefined,
+      buildOnly: undefined,
+    } as nkn.TransactionOptions);
+    return String(txnHash);
+  }
+
+  async unsubscribe(topic: string, fee = "0"): Promise<string> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    const txnHash = await this.client.unsubscribe(topic, "", {
+      fee,
+      attrs: undefined,
+      buildOnly: undefined,
+    } as nkn.TransactionOptions);
+    return String(txnHash);
+  }
+
+  async getSubscribers(topic: string): Promise<string[]> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    const result = await this.client.getSubscribers(topic, {
+      offset: 0,
+      limit: 1000,
+      txPool: true,
+    });
+    const subs = result.subscribers;
+    if (Array.isArray(subs)) {
+      return subs;
+    }
+    // Record<string, string> form — keys are addresses
+    return Object.keys(subs);
+  }
+
+  async getSubscribersCount(topic: string): Promise<number> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    return this.client.getSubscribersCount(topic);
+  }
+
+  async getSubscription(
+    topic: string,
+    subscriber: string,
+  ): Promise<{ meta: string; expiresAt: number }> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    return this.client.getSubscription(topic, subscriber);
+  }
+
+  async getLatestBlock(): Promise<{ height: number; hash: string }> {
+    if (!this.client || this.status.state !== "connected") {
+      throw new Error("NKN client not connected");
+    }
+    return this.client.getLatestBlock();
+  }
+
+  getPublicKey(): string {
+    if (!this.client) {
+      throw new Error("NKN client not connected");
+    }
+    return this.client.getPublicKey();
+  }
+
+  getAddress(): string | undefined {
+    return this.status.address;
+  }
+
   private updateStatus(status: ClientStatus): void {
     this.status = status;
     this.emit("statusChange", status);

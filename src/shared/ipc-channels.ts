@@ -47,9 +47,22 @@ export const IPC = {
     GET: "session:get",
     DELETE: "session:delete",
     ON_UPDATE: "session:onUpdate",
+    ON_DELETE: "session:onDelete",
   },
   SETTINGS: {
     GET: "settings:get",
     SET: "settings:set",
+  },
+  TOPIC: {
+    CREATE: "topic:create",
+    JOIN: "topic:join",
+    LEAVE: "topic:leave",
+    LIST: "topic:list",
+    GET: "topic:get",
+    GET_SUBSCRIBERS: "topic:getSubscribers",
+    REFRESH_SUBSCRIBERS: "topic:refreshSubscribers",
+    SEND_MESSAGE: "topic:sendMessage",
+    ON_UPDATE: "topic:onUpdate",
+    ON_DELETE: "topic:onDelete",
   },
 } as const;

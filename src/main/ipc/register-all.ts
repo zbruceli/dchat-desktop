@@ -4,11 +4,13 @@ import { registerContactHandlers } from "./contact-handlers";
 import { registerSessionHandlers } from "./session-handlers";
 import { registerWalletHandlers } from "./wallet-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
+import { registerTopicHandlers } from "./topic-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { ChatService } from "../services/chat-service";
 import type { ContactService } from "../services/contact-service";
 import type { SessionService } from "../services/session-service";
 import type { IpfsService } from "../services/ipfs-service";
+import type { TopicService } from "../services/topic-service";
 
 export interface RegisterHandlersParams {
   nknClient: NknClientService;
@@ -16,6 +18,7 @@ export interface RegisterHandlersParams {
   contactService: ContactService;
   sessionService: SessionService;
   ipfsService?: IpfsService;
+  topicService?: TopicService;
 }
 
 export function registerAllHandlers(params: RegisterHandlersParams): void {
@@ -25,4 +28,7 @@ export function registerAllHandlers(params: RegisterHandlersParams): void {
   registerSessionHandlers(params.sessionService, params.chatService);
   registerWalletHandlers();
   registerSettingsHandlers(params.ipfsService);
+  if (params.topicService) {
+    registerTopicHandlers(params.topicService);
+  }
 }

@@ -6,6 +6,7 @@ interface SessionState {
   loadSessions: () => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   handleSessionUpdate: (session: Session) => void;
+  handleSessionDelete: (sessionId: string) => void;
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -36,5 +37,11 @@ export const useSessionStore = create<SessionState>((set) => ({
       updated.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
       return { sessions: updated };
     });
+  },
+
+  handleSessionDelete: (sessionId: string) => {
+    set((state) => ({
+      sessions: state.sessions.filter((s) => s.id !== sessionId),
+    }));
   },
 }));
