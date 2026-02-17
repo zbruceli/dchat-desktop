@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from "electron";
+import { dialog, ipcMain, shell } from "electron";
 import { IPC } from "../../shared/ipc-channels";
 import type { ChatService } from "../services/chat-service";
 import type { SendMessageParams } from "../../shared/types";
@@ -52,6 +52,35 @@ export function registerChatHandlers(chatService: ChatService): void {
     IPC.CHAT.DOWNLOAD_AUDIO,
     async (_event, messageId: string) => {
       await chatService.retryAudioDownload(messageId);
+    },
+  );
+
+  ipcMain.handle(IPC.CHAT.PICK_FILE, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle(
+    IPC.CHAT.SEND_FILE,
+    async (_event, to: string, filePath: string) => {
+      return await chatService.sendFileMessage(to, filePath);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.CHAT.DOWNLOAD_FILE,
+    async (_event, messageId: string) => {
+      await chatService.retryFileDownload(messageId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.CHAT.OPEN_FILE,
+    async (_event, localPath: string) => {
+      return await shell.openPath(localPath);
     },
   );
 

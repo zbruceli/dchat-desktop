@@ -3,6 +3,7 @@ import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { ImageModal } from "./ImageModal";
 import { AudioContent } from "./AudioContent";
+import { FileContent } from "./FileContent";
 
 interface MessageBubbleProps {
   message: Message;
@@ -157,7 +158,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isIpfsAudio =
     message.contentType === "ipfs" &&
     (opts?.fileType === 2 || opts?.fileType === "2");
-  const isIpfsImage = message.contentType === "ipfs" && !isIpfsAudio;
+  const isIpfsImage =
+    message.contentType === "ipfs" &&
+    !isIpfsAudio &&
+    (opts?.fileType === 1 || opts?.fileType === "1" || opts?.fileType === undefined);
+  const isIpfsFile =
+    message.contentType === "ipfs" && !isIpfsAudio && !isIpfsImage;
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -185,6 +191,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       >
         {isAudio || isIpfsAudio ? (
           <AudioContent message={message} />
+        ) : isIpfsFile ? (
+          <FileContent message={message} />
         ) : isIpfsImage ? (
           <ImageContent message={message} />
         ) : (

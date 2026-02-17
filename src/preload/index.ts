@@ -41,6 +41,14 @@ const api = {
       ipcRenderer.invoke("chat:downloadImage", messageId),
     downloadAudio: (messageId: string): Promise<void> =>
       ipcRenderer.invoke("chat:downloadAudio", messageId),
+    pickFile: (): Promise<string | null> =>
+      ipcRenderer.invoke("chat:pickFile"),
+    sendFile: (to: string, filePath: string): Promise<Message> =>
+      ipcRenderer.invoke("chat:sendFile", to, filePath),
+    downloadFile: (messageId: string): Promise<void> =>
+      ipcRenderer.invoke("chat:downloadFile", messageId),
+    openFile: (localFilePath: string): Promise<string> =>
+      ipcRenderer.invoke("chat:openFile", localFilePath),
     getMessages: (sessionId: string): Promise<Message[]> =>
       ipcRenderer.invoke("chat:getMessages", sessionId),
     startSession: (targetAddress: string): Promise<{ sessionId: string }> =>

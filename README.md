@@ -23,6 +23,8 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **NKN wallet management** — Create new wallet, import from keystore JSON, restore saved wallet
 - **1-to-1 messaging** — Send/receive encrypted text messages over NKN relay network
 - **Image messaging** — Send/receive images encrypted with AES-128-GCM, stored on IPFS, fully interoperable with nMobile
+- **Voice messaging** — Record voice messages (0.5s–60s), WebM/Opus converted to AAC-ADTS for nMobile compatibility, inline play/pause with progress bar
+- **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, click to open with system default app, nMobile-compatible
 - **IPFS integration** — Encrypted upload/download via nMobile's IPFS nodes, multi-gateway fallback, configurable in Settings
 - **Thumbnail preview** — 120x120 thumbnails uploaded separately to IPFS; receiver sees thumbnail immediately while full image downloads in background
 - **Image viewer** — Click images to open full-screen lightbox, retry failed downloads
@@ -41,7 +43,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Message receipts** — Delivered and read status tracking
 - **NKN wallet UI** — Balance display, send/receive NKN tokens
 - **Group chat** — Public topics (on-chain) and private groups (signature-based)
-- **Audio, video, file sharing** — Additional media types via IPFS
+- **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
 - **Desktop notifications** — Native OS notifications for new messages
 
@@ -105,8 +107,10 @@ src/
 │   ├── index.ts         App entry — DB init, services, IPC registration
 │   ├── services/        Business logic
 │   │   ├── nkn-client-service.ts   NKN MultiClient wrapper
-│   │   ├── chat-service.ts         Send/receive text + image orchestration
+│   │   ├── chat-service.ts         Send/receive text + image + audio + file orchestration
 │   │   ├── image-service.ts        Image resize, thumbnail, encrypt, IPFS upload/download
+│   │   ├── audio-service.ts        WebM→AAC conversion, inline base64 encoding, IPFS audio
+│   │   ├── file-service.ts         Generic file encrypt, IPFS upload/download, cache
 │   │   ├── ipfs-service.ts         IPFS HTTP API upload/download, multi-gateway
 │   │   ├── contact-service.ts      Contact CRUD
 │   │   └── session-service.ts      Session CRUD
@@ -120,7 +124,7 @@ src/
 ├── renderer/          React UI (runs in browser context)
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
 │   ├── pages/           Login, Chat (two-panel), Contacts, Settings
-│   ├── components/      Chat bubbles, image display, lightbox, session list, message input
+│   ├── components/      Chat bubbles, image display, lightbox, file display, session list, message input
 │   ├── stores/          Zustand stores (client, chat, contact, session)
 │   └── hooks/           IPC push-event subscriptions
 ├── shared/            Code shared between main and renderer
@@ -152,6 +156,7 @@ Context isolation is enabled and `nodeIntegration` is disabled — the renderer 
 | Database | better-sqlite3 (SQLCipher planned) |
 | Crypto | Node.js crypto (AES-128-GCM, nMobile-compatible) |
 | Image Processing | sharp (resize, thumbnail generation) |
+| Audio Processing | fluent-ffmpeg + @ffmpeg-installer/ffmpeg (WebM→AAC) |
 | Bundler | Vite (renderer), tsc (main/preload) |
 | Packaging | electron-builder |
 | Testing | Vitest, Playwright |
@@ -183,7 +188,7 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 | Phase | Focus | Status |
 |---|---|---|
 | 1 | Foundation — NKN client, 1-to-1 messaging, contacts, SQLite DB | Complete |
-| 2 | Rich messaging — Image messaging, IPFS, thumbnails, AES-GCM encryption | In Progress |
+| 2 | Rich messaging — Image, voice, and file messaging, IPFS, AES-GCM encryption | Complete |
 | 3 | Group chat — Public topics, private groups | Planned |
 | 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | Planned |
 

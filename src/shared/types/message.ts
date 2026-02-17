@@ -36,7 +36,8 @@ export interface MessageOptions {
   ipfsThumbnailEncryptNonceSize?: number;
 
   // File info
-  fileType?: number | string; // nMobile sends 1 for image
+  fileType?: number | string; // 0=normal, 1=image, 2=audio, 3=video
+  fileName?: string; // original filename (e.g., "report.pdf")
   fileExt?: string; // "png" or ".jpg"
   fileMimeType?: string;
   fileSize?: number;

@@ -10,17 +10,32 @@ export function MessageThread() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const sendImage = useChatStore((s) => s.sendImage);
   const sendAudio = useChatStore((s) => s.sendAudio);
+  const sendFile = useChatStore((s) => s.sendFile);
   const sessions = useSessionStore((s) => s.sessions);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevSessionRef = useRef<string | null>(null);
+  const prevMessageCountRef = useRef<number>(0);
 
   const messages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
   const session = sessions.find((s) => s.id === activeSessionId);
 
-  // Auto-scroll to bottom on new messages
+  // Scroll to bottom: instantly on session switch, smoothly on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    const sessionChanged = activeSessionId !== prevSessionRef.current;
+    const messageCountChanged = messages.length !== prevMessageCountRef.current;
+
+    prevSessionRef.current = activeSessionId;
+    prevMessageCountRef.current = messages.length;
+
+    if (sessionChanged) {
+      // Instant scroll when opening a conversation
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    } else if (messageCountChanged) {
+      // Smooth scroll for new incoming/outgoing messages
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeSessionId, messages.length]);
 
   if (!activeSessionId || !session) {
     return (
@@ -45,6 +60,12 @@ export function MessageThread() {
   function handleSendAudio(audioBuffer: ArrayBuffer, durationSeconds: number) {
     if (session) {
       sendAudio(session.targetAddress, audioBuffer, durationSeconds);
+    }
+  }
+
+  function handleSendFile() {
+    if (session) {
+      sendFile(session.targetAddress);
     }
   }
 
@@ -79,7 +100,7 @@ export function MessageThread() {
       </div>
 
       {/* Input */}
-      <MessageInput onSend={handleSend} onSendImage={handleSendImage} onSendAudio={handleSendAudio} />
+      <MessageInput onSend={handleSend} onSendImage={handleSendImage} onSendAudio={handleSendAudio} onSendFile={handleSendFile} />
     </div>
   );
 }

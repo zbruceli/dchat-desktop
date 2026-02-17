@@ -9,8 +9,11 @@ interface ChatState {
   sendMessage: (to: string, content: string) => Promise<void>;
   sendImage: (to: string) => Promise<void>;
   sendAudio: (to: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
+  sendFile: (to: string) => Promise<void>;
   downloadImage: (messageId: string) => Promise<void>;
   downloadAudio: (messageId: string) => Promise<void>;
+  downloadFile: (messageId: string) => Promise<void>;
+  openFile: (localFilePath: string) => Promise<void>;
   startSession: (targetAddress: string) => Promise<string>;
   handleIncomingMessage: (message: Message) => void;
 }
@@ -59,12 +62,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  sendFile: async (to: string) => {
+    try {
+      const filePath = await window.dchat.chat.pickFile();
+      if (!filePath) return;
+      await window.dchat.chat.sendFile(to, filePath);
+    } catch (err) {
+      console.error("sendFile failed:", err);
+    }
+  },
+
   downloadImage: async (messageId: string) => {
     await window.dchat.chat.downloadImage(messageId);
   },
 
   downloadAudio: async (messageId: string) => {
     await window.dchat.chat.downloadAudio(messageId);
+  },
+
+  downloadFile: async (messageId: string) => {
+    await window.dchat.chat.downloadFile(messageId);
+  },
+
+  openFile: async (localFilePath: string) => {
+    await window.dchat.chat.openFile(localFilePath);
   },
 
   startSession: async (targetAddress: string) => {

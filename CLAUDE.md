@@ -8,16 +8,20 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation) and Phase 2 image messaging are complete. The app is a functional decentralized messenger with full image support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text and image messages with persistent history, and interoperate with nMobile.
+Phase 1 (Foundation) and Phase 2 image, voice, and file messaging are complete. The app is a functional decentralized messenger with full image, voice, and file support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, and interoperate with nMobile.
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply, connection state management (`src/main/services/nkn-client-service.ts`)
 - **1-to-1 messaging** — Send/receive text messages over NKN relay, with sending/sent/failed status tracking (`src/main/services/chat-service.ts`)
 - **Image messaging** — Send/receive encrypted images via IPFS, nMobile-compatible wire format (`src/main/services/chat-service.ts`)
+- **Voice messaging** — Record WebM/Opus via MediaRecorder, convert to AAC-ADTS via ffmpeg, send inline as base64 data-URI, nMobile-compatible (`src/main/services/audio-service.ts`)
+- **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, nMobile-compatible wire format with `fileType: 0`, open with system default app (`src/main/services/file-service.ts`)
 - **IPFS integration** — Upload/download encrypted files to nMobile's IPFS nodes (default `64.225.88.71:80`), multi-gateway fallback (`src/main/services/ipfs-service.ts`)
 - **Image processing** — Resize, thumbnail generation (120x120), AES-128-GCM encryption, local caching (`src/main/services/image-service.ts`)
+- **Audio processing** — WebM→AAC-ADTS conversion via ffmpeg (mono, 48kbps, 22050Hz), local caching in `audio-cache/` (`src/main/services/audio-service.ts`)
+- **File processing** — AES-128-GCM encryption, IPFS upload/download, local caching in `file-cache/` (`src/main/services/file-service.ts`)
 - **AES-GCM crypto** — Encrypt/decrypt with 16-byte keys, 12-byte nonce prepended to ciphertext, nMobile-compatible format (`src/main/crypto/aes-gcm.ts`)
-- **Custom protocol** — `dchat-media://` file protocol for serving cached images to renderer securely
+- **Custom protocol** — `dchat-media://` file protocol for serving cached images, audio, and files to renderer securely (with explicit MIME types)
 - **Contact management** — Add/delete contacts by NKN address, auto-create contacts for unknown senders (`src/main/services/contact-service.ts`)
 - **SQLite database** — `better-sqlite3` with WAL mode, foreign keys, version-based migrations (`src/main/db/`)
 - **Repository pattern** — MessageRepository, ContactRepository, SessionRepository with typed row mapping
@@ -27,6 +31,8 @@ Phase 1 (Foundation) and Phase 2 image messaging are complete. The app is a func
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
+- **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
+- **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — IPFS gateway configuration (host/port) (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
@@ -40,7 +46,7 @@ Phase 1 (Foundation) and Phase 2 image messaging are complete. The app is a func
 - Electron safeStorage for private key persistence
 - Wallet page UI (placeholder screen)
 - Message receipts (delivered/read status)
-- Audio, video, and file sharing
+- Video sharing
 - Group chat (topics, private groups)
 - Desktop notifications
 
@@ -56,6 +62,7 @@ Phase 1 (Foundation) and Phase 2 image messaging are complete. The app is a func
 | NKN Networking | nkn-sdk | Installed |
 | Crypto | Node.js `crypto` module (AES-128-GCM) | Implemented |
 | Image Processing | sharp (resize, thumbnail generation) | Installed |
+| Audio Processing | fluent-ffmpeg + @ffmpeg-installer/ffmpeg (WebM→AAC) | Installed |
 | Secure Storage | Electron safeStorage API | Not yet added |
 | File Storage | IPFS (HTTP gateway, nMobile nodes) | Implemented |
 | Native rebuild | @electron/rebuild | Installed |
@@ -101,15 +108,17 @@ dchat/
 │   │   ├── ipc/                     # IPC handlers (main ↔ renderer bridge)
 │   │   │   ├── register-all.ts      # ✅ Barrel that registers all handler groups
 │   │   │   ├── client-handlers.ts   # ✅ client:connect/disconnect/getStatus
-│   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages
+│   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages/sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-handlers.ts  # ✅ contact:add/list/get/delete
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import (NKN SDK)
 │   │   │   └── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   ├── services/                # Business logic (mirrors nMobile common/)
 │   │   │   ├── nkn-client-service.ts # ✅ NKN MultiClient wrapper, connect/send/sendNoReply/events
-│   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image messaging
+│   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image + audio + file messaging
+│   │   │   ├── audio-service.ts     # ✅ WebM→AAC conversion, inline base64 encoding, IPFS audio download/decrypt
 │   │   │   ├── image-service.ts     # ✅ Image resize, thumbnail, AES-GCM encrypt, IPFS upload/download
+│   │   │   ├── file-service.ts      # ✅ Generic file encrypt, IPFS upload/download, cache in file-cache/
 │   │   │   ├── ipfs-service.ts      # ✅ IPFS HTTP API upload/download, multi-gateway fallback
 │   │   │   ├── contact-service.ts   # ✅ Contact CRUD wrapper
 │   │   │   └── session-service.ts   # ✅ Session CRUD wrapper
@@ -121,19 +130,19 @@ dchat/
 │   │   │   │   ├── 002-add-message-options.ts # ✅ options + local_file_path columns on message
 │   │   │   │   └── 003-add-thumbnail-path.ts  # ✅ thumbnail_local_file_path column on message
 │   │   │   └── repositories/
-│   │   │       ├── message-repository.ts  # ✅ insert, findBySessionId, updateStatus, updateOptions, updateLocalFilePath, updateThumbnailLocalFilePath
+│   │   │       ├── message-repository.ts  # ✅ insert, findBySessionId, updateStatus, updateOptions, updateLocalFilePath, updateThumbnailLocalFilePath, updateContentType
 │   │   │       ├── contact-repository.ts  # ✅ upsert, findByAddress, findAll, delete
 │   │   │       └── session-repository.ts  # ✅ upsert, findAll, updateLastMessage, unread
 │   │   └── crypto/
 │   │       └── aes-gcm.ts          # ✅ AES-128-GCM encrypt/decrypt (nMobile-compatible)
 │   ├── renderer/                    # Electron renderer process (React app)
-│   │   ├── index.html               # ✅ HTML shell with CSP
+│   │   ├── index.html               # ✅ HTML shell with CSP (incl. media-src for audio playback)
 │   │   ├── main.tsx                 # ✅ React entry point
 │   │   ├── App.tsx                  # ✅ Auth gate + sidebar nav + page routing
 │   │   ├── env.d.ts                 # ✅ Window.dchat type declaration
 │   │   ├── stores/
 │   │   │   ├── client-store.ts      # ✅ Connection state, connect/disconnect
-│   │   │   ├── chat-store.ts        # ✅ Messages by session, send/load/incoming
+│   │   │   ├── chat-store.ts        # ✅ Messages by session, send/load/incoming, sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-store.ts     # ✅ Contact list, add/delete
 │   │   │   └── session-store.ts     # ✅ Session list, real-time updates
 │   │   ├── pages/
@@ -146,8 +155,11 @@ dchat/
 │   │   │   ├── chat/
 │   │   │   │   ├── SessionList.tsx  # ✅ Conversation list with previews + unread badges
 │   │   │   │   ├── MessageThread.tsx # ✅ Scrollable messages + input, auto-scroll
-│   │   │   │   ├── MessageBubble.tsx # ✅ Text + image bubbles, thumbnail preview, retry, lightbox
-│   │   │   │   ├── MessageInput.tsx # ✅ Text input + image attachment button
+│   │   │   │   ├── MessageBubble.tsx # ✅ Text + image + audio + file bubbles, thumbnail preview, retry, lightbox
+│   │   │   │   ├── MessageInput.tsx # ✅ Text input + image attachment + file attachment + voice record button
+│   │   │   │   ├── FileContent.tsx  # ✅ File display (doc icon, name, size, download/open/retry)
+│   │   │   │   ├── AudioContent.tsx # ✅ Audio player (play/pause, progress bar, duration)
+│   │   │   │   ├── VoiceRecordButton.tsx # ✅ Click-to-record mic button (0.5s–60s, cancel, send)
 │   │   │   │   └── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
 │   │   │   └── common/
 │   │   │       └── ConnectionStatus.tsx # ✅ Green/yellow/red dot + address
@@ -164,7 +176,7 @@ dchat/
 │   │   │   ├── wallet.ts            # ✅ WalletInfo, CreateWalletParams, ImportWalletParams
 │   │   │   └── client.ts            # ✅ ClientStatus
 │   │   ├── constants.ts             # ✅ App constants, NKN seed servers
-│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels
+│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. SEND_AUDIO, DOWNLOAD_AUDIO, SEND_FILE, DOWNLOAD_FILE, OPEN_FILE)
 │   └── preload/
 │       └── index.ts                 # ✅ contextBridge API with typed returns + push listeners
 ├── tests/
@@ -317,6 +329,62 @@ Key conventions:
 - 12-byte nonce is prepended to ciphertext (not sent separately)
 - Thumbnail and full image have separate encryption keys and IPFS hashes
 - `ipfsIp` tells receiver which gateway to prioritize for downloads
+
+### Inline Audio Wire Format (nMobile-compatible)
+```json
+{
+  "id": "uuid",
+  "contentType": "audio",
+  "content": "![audio](data:audio/x-aac;base64,//FgQBD...)",
+  "options": {
+    "fileType": 2,
+    "fileExt": "aac",
+    "fileMimeType": "audio/aac",
+    "mediaDuration": 5.23
+  },
+  "timestamp": 1707900000000
+}
+```
+
+Key conventions:
+- `contentType: "audio"` for inline voice messages (base64 AAC-ADTS)
+- Content is wrapped in nMobile's markdown data-URI format: `![audio](data:audio/x-aac;base64,...)`
+- nMobile also sends `audioDuration` (same value as `mediaDuration`) — D-Chat reads `mediaDuration`
+- `fileType: 2` distinguishes audio from images (`fileType: 1`) in IPFS messages
+- AAC-ADTS is the universal codec — nMobile uses it on both iOS and Android
+- D-Chat converts browser WebM/Opus → AAC-ADTS via ffmpeg before sending
+- Recording constraints: min 0.5s, max 60s
+- Inbound IPFS audio (`contentType: "ipfs"`, `fileType: 2`) is also supported for receiving
+
+### IPFS File Wire Format (nMobile-compatible)
+```json
+{
+  "id": "uuid",
+  "contentType": "ipfs",
+  "content": "QmXyz...",
+  "options": {
+    "fileType": 0,
+    "fileName": "report.pdf",
+    "fileSize": 524288,
+    "fileExt": "pdf",
+    "ipfsHash": "QmXyz...",
+    "ipfsIp": "64.225.88.71",
+    "ipfsEncrypt": 1,
+    "ipfsEncryptAlgorithm": "AES/GCM/NoPadding",
+    "ipfsEncryptKeyBytes": [170, 187, 204, ...],
+    "ipfsEncryptNonceSize": 12
+  },
+  "timestamp": 1707900000000
+}
+```
+
+Key conventions:
+- `contentType: "ipfs"` with `fileType: 0` for generic files (0=normal, 1=image, 2=audio, 3=video)
+- `fileName` contains the original filename (e.g., `"report.pdf"`)
+- No thumbnail for generic files (only images/videos get thumbnails)
+- Same AES-128-GCM encryption as images (16-byte key, 12-byte nonce prepended to ciphertext)
+- Size limit: 100 MB
+- All generic files go through IPFS regardless of size (no inline option)
 
 ### Content Types (~25 types from nMobile)
 - `text` — Plain text message

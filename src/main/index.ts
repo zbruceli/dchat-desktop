@@ -12,6 +12,7 @@ import { SessionService } from "./services/session-service";
 import { IpfsService } from "./services/ipfs-service";
 import { ImageService } from "./services/image-service";
 import { AudioService } from "./services/audio-service";
+import { FileService } from "./services/file-service";
 import { registerAllHandlers } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
@@ -103,6 +104,13 @@ app.whenReady().then(() => {
     ".ogg": "audio/ogg",
     ".wav": "audio/wav",
     ".m4a": "audio/mp4",
+    ".pdf": "application/pdf",
+    ".zip": "application/zip",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".txt": "text/plain",
   };
 
   // Register dchat-media:// protocol handler
@@ -149,8 +157,10 @@ app.whenReady().then(() => {
     pushToRenderer,
   );
   const audioService = new AudioService(ipfsService, userDataPath);
+  const fileService = new FileService(ipfsService, userDataPath);
   chatService.setImageService(imageService);
   chatService.setAudioService(audioService);
+  chatService.setFileService(fileService);
   const contactService = new ContactService(contactRepo);
   const sessionService = new SessionService(sessionRepo);
 
