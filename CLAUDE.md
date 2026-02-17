@@ -12,7 +12,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
-- **1-to-1 messaging** — Send/receive text messages over NKN relay, with sending/sent/failed status tracking (`src/main/services/chat-service.ts`)
+- **1-to-1 messaging** — Send/receive text messages over NKN relay, with sending/sent/failed status tracking, legacy session consolidation (skips topic sessions) (`src/main/services/chat-service.ts`)
 - **Image messaging** — Send/receive encrypted images via IPFS, nMobile-compatible wire format (`src/main/services/chat-service.ts`)
 - **Voice messaging** — Record WebM/Opus via MediaRecorder, convert to AAC-ADTS via ffmpeg, send inline as base64 data-URI, nMobile-compatible (`src/main/services/audio-service.ts`)
 - **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, nMobile-compatible wire format with `fileType: 0`, open with system default app (`src/main/services/file-service.ts`)
@@ -34,7 +34,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
-- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names on inbound messages, member count display, subscriber side panel with refresh from blockchain, Leave button (`src/renderer/components/chat/MessageThread.tsx`)
+- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button (`src/renderer/components/chat/MessageThread.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — IPFS gateway configuration (host/port) (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
