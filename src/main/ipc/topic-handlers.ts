@@ -48,4 +48,11 @@ export function registerTopicHandlers(topicService: TopicService): void {
       return topicService.sendTopicImage(topicName, filePath);
     },
   );
+
+  ipcMain.handle(
+    IPC.TOPIC.SEND_AUDIO,
+    (_event, topicName: string, audioBuffer: ArrayBuffer, durationSeconds: number) => {
+      return topicService.sendTopicAudio(topicName, Buffer.from(audioBuffer), durationSeconds);
+    },
+  );
 }

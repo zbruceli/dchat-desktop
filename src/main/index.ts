@@ -177,6 +177,7 @@ app.whenReady().then(() => {
     pushToRenderer,
   );
   topicService.setImageService(imageService);
+  topicService.setAudioService(audioService);
   chatService.setTopicService(topicService);
 
   const contactService = new ContactService(contactRepo);

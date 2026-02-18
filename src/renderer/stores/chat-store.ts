@@ -10,6 +10,7 @@ interface ChatState {
   sendImage: (to: string) => Promise<void>;
   sendTopicImage: (topicName: string) => Promise<void>;
   sendAudio: (to: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
+  sendTopicAudio: (topicName: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
   sendFile: (to: string) => Promise<void>;
   downloadImage: (messageId: string) => Promise<void>;
   downloadAudio: (messageId: string) => Promise<void>;
@@ -70,6 +71,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await window.dchat.chat.sendAudio(to, audioBuffer, durationSeconds);
     } catch (err) {
       console.error("sendAudio failed:", err);
+    }
+  },
+
+  sendTopicAudio: async (topicName: string, audioBuffer: ArrayBuffer, durationSeconds: number) => {
+    try {
+      await window.dchat.topic.sendAudio(topicName, audioBuffer, durationSeconds);
+    } catch (err) {
+      console.error("sendTopicAudio failed:", err);
     }
   },
 

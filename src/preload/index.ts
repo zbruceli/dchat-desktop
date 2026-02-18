@@ -133,6 +133,8 @@ const api = {
       ipcRenderer.invoke("topic:sendMessage", name, content, contentType),
     sendImage: (name: string, filePath: string): Promise<Message> =>
       ipcRenderer.invoke("topic:sendImage", name, filePath),
+    sendAudio: (name: string, audioBuffer: ArrayBuffer, durationSeconds: number): Promise<Message> =>
+      ipcRenderer.invoke("topic:sendAudio", name, audioBuffer, durationSeconds),
     onUpdate: (callback: (topic: Topic) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, topic: Topic) =>
         callback(topic);

@@ -63,6 +63,7 @@ export const IPC = {
     REFRESH_SUBSCRIBERS: "topic:refreshSubscribers",
     SEND_MESSAGE: "topic:sendMessage",
     SEND_IMAGE: "topic:sendImage",
+    SEND_AUDIO: "topic:sendAudio",
     ON_UPDATE: "topic:onUpdate",
     ON_DELETE: "topic:onDelete",
   },

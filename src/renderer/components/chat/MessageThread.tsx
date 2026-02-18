@@ -140,6 +140,7 @@ export function MessageThread() {
   const sendImage = useChatStore((s) => s.sendImage);
   const sendTopicImage = useChatStore((s) => s.sendTopicImage);
   const sendAudio = useChatStore((s) => s.sendAudio);
+  const sendTopicAudio = useChatStore((s) => s.sendTopicAudio);
   const sendFile = useChatStore((s) => s.sendFile);
   const sessions = useSessionStore((s) => s.sessions);
   const loadSessions = useSessionStore((s) => s.loadSessions);
@@ -205,7 +206,9 @@ export function MessageThread() {
   }
 
   function handleSendAudio(audioBuffer: ArrayBuffer, durationSeconds: number) {
-    if (session && !isTopic) {
+    if (session && isTopic && topicName) {
+      sendTopicAudio(topicName, audioBuffer, durationSeconds);
+    } else if (session && !isTopic) {
       sendAudio(session.targetAddress, audioBuffer, durationSeconds);
     }
   }
@@ -302,7 +305,7 @@ export function MessageThread() {
         <MessageInput
           onSend={handleSend}
           onSendImage={handleSendImage}
-          onSendAudio={isTopic ? undefined : handleSendAudio}
+          onSendAudio={handleSendAudio}
           onSendFile={isTopic ? undefined : handleSendFile}
         />
       </div>
