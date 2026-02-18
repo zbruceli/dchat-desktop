@@ -64,6 +64,7 @@ export const IPC = {
     SEND_MESSAGE: "topic:sendMessage",
     SEND_IMAGE: "topic:sendImage",
     SEND_AUDIO: "topic:sendAudio",
+    SEND_FILE: "topic:sendFile",
     ON_UPDATE: "topic:onUpdate",
     ON_DELETE: "topic:onDelete",
   },

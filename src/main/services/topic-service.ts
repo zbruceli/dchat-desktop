@@ -15,6 +15,7 @@ import type {
 } from "../../shared/types";
 import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
+import type { FileService } from "./file-service";
 
 const TOPIC_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -32,6 +33,7 @@ function genTopicHash(topicName: string): string {
 export class TopicService {
   private imageService: ImageService | null = null;
   private audioService: AudioService | null = null;
+  private fileService: FileService | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -49,6 +51,10 @@ export class TopicService {
 
   setAudioService(audioService: AudioService): void {
     this.audioService = audioService;
+  }
+
+  setFileService(fileService: FileService): void {
+    this.fileService = fileService;
   }
 
   async createAndJoin(topicName: string): Promise<Topic> {
@@ -404,6 +410,80 @@ export class TopicService {
     return message;
   }
 
+  async sendTopicFile(topicName: string, filePath: string): Promise<Message> {
+    if (!this.fileService) throw new Error("File service not configured");
+
+    const myAddress = this.nknClient.getAddress();
+    if (!myAddress) throw new Error("Not connected");
+
+    const now = Date.now();
+    const sessionId = `topic:${topicName}`;
+    const messageId = crypto.randomUUID();
+
+    // Insert placeholder message
+    const message: Message = {
+      id: messageId,
+      sessionId,
+      sender: myAddress,
+      receiver: topicName,
+      contentType: "ipfs",
+      content: "",
+      status: "sending",
+      isOutbound: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.getOrCreateTopicSession(topicName);
+    this.messageRepo.insert(message);
+    this.sessionRepo.updateLastMessage(sessionId, "[File]", now);
+    this.pushToRenderer("chat:onMessage", message);
+    this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
+
+    try {
+      const { content, options, localFilePath } =
+        await this.fileService.processAndUpload(filePath);
+
+      this.messageRepo.updateContent(messageId, content);
+      this.messageRepo.updateOptions(messageId, JSON.stringify(options));
+      this.messageRepo.updateLocalFilePath(messageId, localFilePath);
+
+      message.content = content;
+      message.options = JSON.stringify(options);
+      message.localFilePath = localFilePath;
+
+      this.pushToRenderer("chat:onMessage", { ...message });
+
+      // Send to all subscribers except self
+      const messageData: MessageData = {
+        id: messageId,
+        contentType: "ipfs",
+        content,
+        options,
+        topic: topicName,
+        timestamp: now,
+      };
+
+      const subscribers = this.getSubscriberAddresses(topicName);
+      const dests = subscribers.filter((addr) => addr !== myAddress);
+
+      if (dests.length > 0) {
+        this.nknClient.sendToMultiple(dests, JSON.stringify(messageData));
+      }
+
+      this.messageRepo.updateStatus(messageId, "sent");
+      message.status = "sent";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "sent" });
+    } catch (err) {
+      console.error("[TopicService] sendTopicFile failed:", err);
+      this.messageRepo.updateStatus(messageId, "failed");
+      message.status = "failed";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "failed" });
+    }
+
+    return message;
+  }
+
   handleIncomingTopicControl(
     src: string,
     messageData: MessageData,
@@ -488,8 +568,12 @@ export class TopicService {
     const senderName = contact?.name ?? src.substring(0, 8) + "...";
     const isIpfs = messageData.contentType === "ipfs";
     const isAudio = messageData.contentType === "audio";
+    const fileType = messageData.options?.fileType;
+    const isFile = fileType === 0 || fileType === "0";
     const sessionPreview = isIpfs
-      ? `${senderName}: [Image]`
+      ? isFile
+        ? `${senderName}: [File]`
+        : `${senderName}: [Image]`
       : isAudio
         ? `${senderName}: [Audio]`
         : `${senderName}: ${content}`;
@@ -543,9 +627,10 @@ export class TopicService {
         opts.ipfsHash = content;
       }
 
-      const fileType = opts.fileType;
-      const isImage = fileType === 1 || fileType === "1" || fileType === undefined;
-      const isIpfsAudio = fileType === 2 || fileType === "2";
+      const ipfsFileType = opts.fileType;
+      const isImage = ipfsFileType === 1 || ipfsFileType === "1" || ipfsFileType === undefined;
+      const isIpfsAudio = ipfsFileType === 2 || ipfsFileType === "2";
+      const isIpfsFile = ipfsFileType === 0 || ipfsFileType === "0";
 
       if (isImage && this.imageService) {
         this.downloadTopicIpfsThumbnailThenFull(message, opts).catch((err) => {
@@ -559,6 +644,15 @@ export class TopicService {
       } else if (isIpfsAudio && this.audioService) {
         this.downloadTopicIpfsAudio(message, opts).catch((err) => {
           console.error("[TopicService] IPFS audio download error:", err);
+          this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+          this.pushToRenderer("chat:onMessage", {
+            ...message,
+            localFilePath: "__download_failed__",
+          });
+        });
+      } else if (isIpfsFile && this.fileService) {
+        this.downloadTopicIpfsFile(message, opts).catch((err) => {
+          console.error("[TopicService] IPFS file download error:", err);
           this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
           this.pushToRenderer("chat:onMessage", {
             ...message,
@@ -680,6 +774,51 @@ export class TopicService {
       } catch (err) {
         console.error(
           `[TopicService] IPFS audio download attempt ${attempt}/${retries} failed for ${ipfsHash}:`,
+          err,
+        );
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+    this.pushToRenderer("chat:onMessage", {
+      ...message,
+      localFilePath: "__download_failed__",
+    });
+  }
+
+  private async downloadTopicIpfsFile(
+    message: Message,
+    opts: MessageOptions,
+    retries = 3,
+  ): Promise<void> {
+    const ipfsHash = opts.ipfsHash || message.content;
+    if (!this.fileService || !ipfsHash) return;
+
+    const keyBytes = opts.ipfsEncryptKeyBytes ?? [];
+    const nonceSize = opts.ipfsEncryptNonceSize ?? 12;
+    const fileExt = (opts.fileExt as string) ?? "bin";
+    const fileName = opts.fileName as string | undefined;
+    const preferredIp = opts.ipfsIp;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const localFilePath = await this.fileService.downloadAndDecrypt(
+          ipfsHash,
+          keyBytes,
+          nonceSize,
+          fileExt,
+          fileName,
+          preferredIp,
+        );
+        this.messageRepo.updateLocalFilePath(message.id, localFilePath);
+        this.pushToRenderer("chat:onMessage", { ...message, localFilePath });
+        return;
+      } catch (err) {
+        console.error(
+          `[TopicService] IPFS file download attempt ${attempt}/${retries} failed for ${ipfsHash}:`,
           err,
         );
         if (attempt < retries) {

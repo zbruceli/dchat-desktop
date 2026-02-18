@@ -55,4 +55,11 @@ export function registerTopicHandlers(topicService: TopicService): void {
       return topicService.sendTopicAudio(topicName, Buffer.from(audioBuffer), durationSeconds);
     },
   );
+
+  ipcMain.handle(
+    IPC.TOPIC.SEND_FILE,
+    (_event, topicName: string, filePath: string) => {
+      return topicService.sendTopicFile(topicName, filePath);
+    },
+  );
 }
