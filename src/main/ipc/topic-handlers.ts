@@ -41,4 +41,11 @@ export function registerTopicHandlers(topicService: TopicService): void {
       );
     },
   );
+
+  ipcMain.handle(
+    IPC.TOPIC.SEND_IMAGE,
+    (_event, topicName: string, filePath: string) => {
+      return topicService.sendTopicImage(topicName, filePath);
+    },
+  );
 }

@@ -16,7 +16,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **Image messaging** — Send/receive encrypted images via IPFS, nMobile-compatible wire format (`src/main/services/chat-service.ts`)
 - **Voice messaging** — Record WebM/Opus via MediaRecorder, convert to AAC-ADTS via ffmpeg, send inline as base64 data-URI, nMobile-compatible (`src/main/services/audio-service.ts`)
 - **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, nMobile-compatible wire format with `fileType: 0`, open with system default app (`src/main/services/file-service.ts`)
-- **Group chat (public topics)** — Join/leave NKN blockchain-based topic groups, nMobile-compatible: topic name hashed via SHA-1 (`"dchat" + hex(sha1(name))`), subscribe/unsubscribe blockchain transactions, subscriber list cached locally, messages sent individually to all subscribers (`src/main/services/topic-service.ts`)
+- **Group chat (public topics)** — Join/leave NKN blockchain-based topic groups, nMobile-compatible: topic name hashed via SHA-1 (`"dchat" + hex(sha1(name))`), subscribe/unsubscribe blockchain transactions, subscriber list cached locally, messages sent individually to all subscribers, image support via IPFS (`src/main/services/topic-service.ts`)
 - **IPFS integration** — Upload/download encrypted files to nMobile's IPFS nodes (default `64.225.88.71:80`), multi-gateway fallback (`src/main/services/ipfs-service.ts`)
 - **Image processing** — Resize, thumbnail generation (120x120), AES-128-GCM encryption, local caching (`src/main/services/image-service.ts`)
 - **Audio processing** — WebM→AAC-ADTS conversion via ffmpeg (mono, 48kbps, 22050Hz), local caching in `audio-cache/` (`src/main/services/audio-service.ts`)
@@ -34,7 +34,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
-- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button (`src/renderer/components/chat/MessageThread.tsx`)
+- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button, image send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — IPFS gateway configuration (host/port) (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
@@ -50,7 +50,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - Message receipts (delivered/read status)
 - Video sharing
 - Private groups (off-chain, signature-based membership)
-- Media messages in topics (image/audio/file — currently text-only in group chat)
+- Media messages in topics (audio/file — images now supported, audio and file not yet)
 - Desktop notifications
 
 ## Tech Stack
@@ -116,11 +116,11 @@ dchat/
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import (NKN SDK)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
-│   │   │   └── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage
+│   │   │   └── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage
 │   │   ├── services/                # Business logic (mirrors nMobile common/)
 │   │   │   ├── nkn-client-service.ts # ✅ NKN MultiClient wrapper, connect/send/sendNoReply/subscribe/unsubscribe/getSubscribers/sendToMultiple
 │   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image + audio + file messaging, topic message routing
-│   │   │   ├── topic-service.ts     # ✅ Topic join/leave, subscriber sync, topic message send/receive, control messages
+│   │   │   ├── topic-service.ts     # ✅ Topic join/leave, subscriber sync, topic message send/receive, control messages, image send/receive via IPFS
 │   │   │   ├── audio-service.ts     # ✅ WebM→AAC conversion, inline base64 encoding, IPFS audio download/decrypt
 │   │   │   ├── image-service.ts     # ✅ Image resize, thumbnail, AES-GCM encrypt, IPFS upload/download
 │   │   │   ├── file-service.ts      # ✅ Generic file encrypt, IPFS upload/download, cache in file-cache/

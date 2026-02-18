@@ -176,6 +176,7 @@ app.whenReady().then(() => {
     contactRepo,
     pushToRenderer,
   );
+  topicService.setImageService(imageService);
   chatService.setTopicService(topicService);
 
   const contactService = new ContactService(contactRepo);

@@ -11,7 +11,9 @@ import type {
   Message,
   MessageData,
   MessageContentType,
+  MessageOptions,
 } from "../../shared/types";
+import type { ImageService } from "./image-service";
 
 const TOPIC_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -27,6 +29,8 @@ function genTopicHash(topicName: string): string {
 }
 
 export class TopicService {
+  private imageService: ImageService | null = null;
+
   constructor(
     private nknClient: NknClientService,
     private topicRepo: TopicRepository,
@@ -36,6 +40,10 @@ export class TopicService {
     private contactRepo: ContactRepository,
     private pushToRenderer: (channel: string, data: unknown) => void,
   ) {}
+
+  setImageService(imageService: ImageService): void {
+    this.imageService = imageService;
+  }
 
   async createAndJoin(topicName: string): Promise<Topic> {
     if (!TOPIC_NAME_REGEX.test(topicName)) {
@@ -238,6 +246,83 @@ export class TopicService {
     return message;
   }
 
+  async sendTopicImage(topicName: string, filePath: string): Promise<Message> {
+    if (!this.imageService) throw new Error("Image service not configured");
+
+    const myAddress = this.nknClient.getAddress();
+    if (!myAddress) throw new Error("Not connected");
+
+    const now = Date.now();
+    const sessionId = `topic:${topicName}`;
+    const messageId = crypto.randomUUID();
+
+    // Insert placeholder message
+    const message: Message = {
+      id: messageId,
+      sessionId,
+      sender: myAddress,
+      receiver: topicName,
+      contentType: "ipfs",
+      content: "",
+      status: "sending",
+      isOutbound: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.getOrCreateTopicSession(topicName);
+    this.messageRepo.insert(message);
+    this.sessionRepo.updateLastMessage(sessionId, "[Image]", now);
+    this.pushToRenderer("chat:onMessage", message);
+    this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
+
+    try {
+      const { options, localFilePath, thumbnailLocalFilePath } =
+        await this.imageService.processAndUpload(filePath);
+
+      const ipfsHash = options.ipfsHash ?? "";
+      this.messageRepo.updateContent(messageId, ipfsHash);
+      this.messageRepo.updateOptions(messageId, JSON.stringify(options));
+      this.messageRepo.updateLocalFilePath(messageId, localFilePath);
+      this.messageRepo.updateThumbnailLocalFilePath(messageId, thumbnailLocalFilePath);
+
+      message.content = ipfsHash;
+      message.options = JSON.stringify(options);
+      message.localFilePath = localFilePath;
+      message.thumbnailLocalFilePath = thumbnailLocalFilePath;
+
+      this.pushToRenderer("chat:onMessage", { ...message });
+
+      // Send to all subscribers except self
+      const messageData: MessageData = {
+        id: messageId,
+        contentType: "ipfs",
+        content: ipfsHash,
+        options,
+        topic: topicName,
+        timestamp: now,
+      };
+
+      const subscribers = this.getSubscriberAddresses(topicName);
+      const dests = subscribers.filter((addr) => addr !== myAddress);
+
+      if (dests.length > 0) {
+        this.nknClient.sendToMultiple(dests, JSON.stringify(messageData));
+      }
+
+      this.messageRepo.updateStatus(messageId, "sent");
+      message.status = "sent";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "sent" });
+    } catch (err) {
+      console.error("[TopicService] sendTopicImage failed:", err);
+      this.messageRepo.updateStatus(messageId, "failed");
+      message.status = "failed";
+      this.pushToRenderer("chat:onMessage", { ...message, status: "failed" });
+    }
+
+    return message;
+  }
+
   handleIncomingTopicControl(
     src: string,
     messageData: MessageData,
@@ -320,7 +405,10 @@ export class TopicService {
     // Sender name for session preview
     const contact = this.contactRepo.findByAddress(src);
     const senderName = contact?.name ?? src.substring(0, 8) + "...";
-    const sessionPreview = `${senderName}: ${content}`;
+    const isIpfs = messageData.contentType === "ipfs";
+    const sessionPreview = isIpfs
+      ? `${senderName}: [Image]`
+      : `${senderName}: ${content}`;
 
     const message: Message = {
       id: messageData.id,
@@ -346,6 +434,32 @@ export class TopicService {
 
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
+
+    // Background download for IPFS content (mirrors ChatService pattern)
+    const hasIpfsData =
+      messageData.options?.ipfsHash ||
+      (isIpfs && content && content.startsWith("Qm"));
+
+    if (isIpfs && hasIpfsData && this.imageService) {
+      const opts = messageData.options ?? {};
+      if (!opts.ipfsHash && content) {
+        opts.ipfsHash = content;
+      }
+
+      const fileType = opts.fileType;
+      const isImage = fileType === 1 || fileType === "1" || fileType === undefined;
+
+      if (isImage) {
+        this.downloadTopicIpfsThumbnailThenFull(message, opts).catch((err) => {
+          console.error("[TopicService] IPFS image download error:", err);
+          this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+          this.pushToRenderer("chat:onMessage", {
+            ...message,
+            localFilePath: "__download_failed__",
+          });
+        });
+      }
+    }
   }
 
   listTopics(): Topic[] {
@@ -354,6 +468,81 @@ export class TopicService {
 
   getTopic(topicName: string): Topic | undefined {
     return this.topicRepo.findById(topicName);
+  }
+
+  private async downloadTopicIpfsImage(
+    message: Message,
+    opts: MessageOptions,
+    retries = 3,
+  ): Promise<void> {
+    const ipfsHash = opts.ipfsHash || message.content;
+    if (!this.imageService || !ipfsHash) return;
+
+    const keyBytes = opts.ipfsEncryptKeyBytes ?? [];
+    const nonceSize = opts.ipfsEncryptNonceSize ?? 12;
+    const fileExt = opts.fileExt ?? "jpg";
+    const preferredIp = opts.ipfsIp;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const localFilePath = await this.imageService.downloadAndDecrypt(
+          ipfsHash,
+          keyBytes,
+          nonceSize,
+          fileExt,
+          preferredIp,
+        );
+        this.messageRepo.updateLocalFilePath(message.id, localFilePath);
+        this.pushToRenderer("chat:onMessage", { ...message, localFilePath });
+        return;
+      } catch (err) {
+        console.error(
+          `[TopicService] IPFS download attempt ${attempt}/${retries} failed for ${ipfsHash}:`,
+          err,
+        );
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    this.messageRepo.updateLocalFilePath(message.id, "__download_failed__");
+    this.pushToRenderer("chat:onMessage", {
+      ...message,
+      localFilePath: "__download_failed__",
+    });
+  }
+
+  private async downloadTopicIpfsThumbnailThenFull(
+    message: Message,
+    opts: MessageOptions,
+  ): Promise<void> {
+    const thumbHash = opts.ipfsThumbnailHash;
+    const thumbKeyBytes = opts.ipfsThumbnailEncryptKeyBytes;
+    const thumbNonceSize = opts.ipfsThumbnailEncryptNonceSize ?? 12;
+    const preferredIp = opts.ipfsThumbnailIp || opts.ipfsIp;
+
+    if (thumbHash && thumbKeyBytes && thumbKeyBytes.length > 0 && this.imageService) {
+      try {
+        const thumbPath = await this.imageService.downloadAndDecrypt(
+          thumbHash,
+          thumbKeyBytes,
+          thumbNonceSize,
+          opts.fileExt ?? "jpg",
+          preferredIp,
+        );
+        this.messageRepo.updateThumbnailLocalFilePath(message.id, thumbPath);
+        this.pushToRenderer("chat:onMessage", {
+          ...message,
+          thumbnailLocalFilePath: thumbPath,
+        });
+        message.thumbnailLocalFilePath = thumbPath;
+      } catch (err) {
+        console.error(`[TopicService] Thumbnail download failed for ${thumbHash}:`, err);
+      }
+    }
+
+    await this.downloadTopicIpfsImage(message, opts);
   }
 
   private getOrCreateTopicSession(topicName: string): void {

@@ -131,6 +131,8 @@ const api = {
       ipcRenderer.invoke("topic:refreshSubscribers", name),
     sendMessage: (name: string, content: string, contentType?: string): Promise<Message> =>
       ipcRenderer.invoke("topic:sendMessage", name, content, contentType),
+    sendImage: (name: string, filePath: string): Promise<Message> =>
+      ipcRenderer.invoke("topic:sendImage", name, filePath),
     onUpdate: (callback: (topic: Topic) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, topic: Topic) =>
         callback(topic);

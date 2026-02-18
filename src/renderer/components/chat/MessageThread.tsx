@@ -138,6 +138,7 @@ export function MessageThread() {
   const messagesBySession = useChatStore((s) => s.messagesBySession);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const sendImage = useChatStore((s) => s.sendImage);
+  const sendTopicImage = useChatStore((s) => s.sendTopicImage);
   const sendAudio = useChatStore((s) => s.sendAudio);
   const sendFile = useChatStore((s) => s.sendFile);
   const sessions = useSessionStore((s) => s.sessions);
@@ -196,7 +197,9 @@ export function MessageThread() {
   }
 
   function handleSendImage() {
-    if (session && !isTopic) {
+    if (session && isTopic && topicName) {
+      sendTopicImage(topicName);
+    } else if (session && !isTopic) {
       sendImage(session.targetAddress);
     }
   }
@@ -298,7 +301,7 @@ export function MessageThread() {
         {/* Input */}
         <MessageInput
           onSend={handleSend}
-          onSendImage={isTopic ? undefined : handleSendImage}
+          onSendImage={handleSendImage}
           onSendAudio={isTopic ? undefined : handleSendAudio}
           onSendFile={isTopic ? undefined : handleSendFile}
         />
