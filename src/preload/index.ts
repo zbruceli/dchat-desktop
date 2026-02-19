@@ -74,6 +74,18 @@ const api = {
       ipcRenderer.invoke("contact:get", address),
     delete: (address: string): Promise<void> =>
       ipcRenderer.invoke("contact:delete", address),
+    update: (address: string, name?: string): Promise<Contact | null> =>
+      ipcRenderer.invoke("contact:update", address, name),
+    pickAvatar: (): Promise<string | null> =>
+      ipcRenderer.invoke("contact:pickAvatar"),
+    setAvatar: (address: string, filePath: string): Promise<Contact | null> =>
+      ipcRenderer.invoke("contact:setAvatar", address, filePath),
+    onUpdate: (callback: (contact: Contact) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, contact: Contact) =>
+        callback(contact);
+      ipcRenderer.on("contact:onUpdate", handler);
+      return () => ipcRenderer.removeListener("contact:onUpdate", handler);
+    },
   },
   wallet: {
     create: (password: string): Promise<WalletInfo> =>
@@ -88,6 +100,14 @@ const api = {
       ipcRenderer.invoke("wallet:loadSeed"),
     clearSeed: (): Promise<void> =>
       ipcRenderer.invoke("wallet:clearSeed"),
+    transfer: (
+      toAddress: string,
+      amount: string,
+      fee: string,
+    ): Promise<{ txnHash: string }> =>
+      ipcRenderer.invoke("wallet:transfer", toAddress, amount, fee),
+    addressFromClient: (clientAddress: string): Promise<string> =>
+      ipcRenderer.invoke("wallet:addressFromClient", clientAddress),
   },
   session: {
     list: (): Promise<Session[]> =>

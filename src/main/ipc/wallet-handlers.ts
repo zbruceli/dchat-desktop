@@ -103,6 +103,80 @@ export function registerWalletHandlers(): void {
     return { seed, walletAddress };
   });
 
+  ipcMain.handle(
+    IPC.WALLET.TRANSFER,
+    async (
+      _event,
+      toAddress: string,
+      amount: string,
+      fee: string,
+    ): Promise<{ txnHash: string }> => {
+      // Load wallet seed
+      const db = getDatabase();
+      const seedRow = db
+        .prepare(`SELECT value FROM settings WHERE key = ?`)
+        .get("encrypted_seed") as { value: string } | undefined;
+      if (!seedRow) throw new Error("No wallet seed found");
+
+      let seed: string;
+      const stored = JSON.parse(seedRow.value);
+      if (safeStorage.isEncryptionAvailable()) {
+        try {
+          const buffer = Buffer.from(stored, "base64");
+          seed = safeStorage.decryptString(buffer);
+        } catch {
+          seed = stored;
+        }
+      } else {
+        seed = stored;
+      }
+
+      const wallet = new nkn.Wallet({ seed });
+
+      // Validate address
+      try {
+        nkn.Wallet.verifyAddress(toAddress);
+      } catch {
+        throw new Error("Invalid NKN wallet address");
+      }
+
+      // Check balance
+      const balance = await wallet.getBalance();
+      const amountNum = parseFloat(amount);
+      const feeNum = parseFloat(fee);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error("Amount must be greater than 0");
+      }
+      if (isNaN(feeNum) || feeNum < 0) {
+        throw new Error("Fee must be 0 or greater");
+      }
+      const balanceNum = parseFloat(balance.toString());
+      if (amountNum + feeNum > balanceNum) {
+        throw new Error(
+          `Insufficient balance. Have ${balanceNum} NKN, need ${amountNum + feeNum} NKN`,
+        );
+      }
+
+      // Execute transfer (buildOnly=false returns txn hash string)
+      const result = await wallet.transferTo(toAddress, amount, {
+        fee,
+        attrs: undefined,
+        buildOnly: false,
+      });
+      return { txnHash: String(result) };
+    },
+  );
+
+  ipcMain.handle(
+    IPC.WALLET.ADDRESS_FROM_CLIENT,
+    (_event, clientAddress: string): string => {
+      // NKN client address format: "identifier.publicKey" or just "publicKey"
+      const dotIndex = clientAddress.lastIndexOf(".");
+      const publicKey = dotIndex >= 0 ? clientAddress.slice(dotIndex + 1) : clientAddress;
+      return nkn.Wallet.publicKeyToAddress(publicKey);
+    },
+  );
+
   ipcMain.handle(IPC.WALLET.CLEAR_SEED, () => {
     const db = getDatabase();
     db.prepare(`DELETE FROM settings WHERE key = ?`).run("encrypted_seed");

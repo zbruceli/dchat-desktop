@@ -100,6 +100,12 @@ export class SessionRepository {
       .run(Date.now(), id);
   }
 
+  updateTargetName(id: string, name: string): void {
+    this.db
+      .prepare(`UPDATE session SET target_name = ?, updated_at = ? WHERE id = ?`)
+      .run(name, Date.now(), id);
+  }
+
   deleteById(id: string): void {
     this.db.prepare(`DELETE FROM session WHERE id = ?`).run(id);
   }

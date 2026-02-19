@@ -35,6 +35,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
 - **Auth gate** — Login page when disconnected, full app when connected
 - **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
+- **NKN wallet** — View balance, send NKN tokens to any address (with contact picker and auto client→wallet address conversion), receive section with copyable addresses, transaction links to [nscan.io](https://nscan.io)
 - **Settings page** — Profile editing (nickname + avatar) and IPFS gateway configuration
 - **Dark theme UI** — Tailwind CSS dark theme with chat bubbles, session list, and contact management
 - Hot-reload development environment
@@ -42,7 +43,6 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 ### Coming Soon
 - **Encrypted local storage** — SQLCipher database encryption (key derived from wallet seed)
 - **Message receipts** — Delivered and read status tracking
-- **NKN wallet UI** — Balance display, send/receive NKN tokens
 - **Group chat** — Public topics (on-chain) and private groups (signature-based)
 - **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
@@ -125,7 +125,7 @@ src/
 │       └── aes-gcm.ts             AES-128-GCM encrypt/decrypt (nMobile-compatible)
 ├── renderer/          React UI (runs in browser context)
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
-│   ├── pages/           Login, Chat (two-panel), Contacts, Settings
+│   ├── pages/           Login, Chat (two-panel), Contacts, Wallet, Settings
 │   ├── components/      Chat bubbles, image display, lightbox, file display, session list, message input
 │   ├── stores/          Zustand stores (client, chat, contact, session, profile)
 │   └── hooks/           IPC push-event subscriptions
@@ -191,8 +191,8 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 |---|---|---|
 | 1 | Foundation — NKN client, 1-to-1 messaging, contacts, SQLite DB | Complete |
 | 2 | Rich messaging — Image, voice, and file messaging, IPFS, AES-GCM encryption | Complete |
-| 3 | Group chat — Public topics, private groups | Planned |
-| 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | Planned |
+| 3 | Group chat — Public topics, private groups | Public topics complete |
+| 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | NKN wallet complete |
 
 ## Acknowledgments
 

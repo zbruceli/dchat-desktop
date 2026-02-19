@@ -8,7 +8,7 @@ export type {
   SendImageParams,
 } from "./message";
 
-export type { Contact, AddContactParams } from "./contact";
+export type { Contact, AddContactParams, UpdateContactParams } from "./contact";
 
 export type { Session, SessionType } from "./session";
 

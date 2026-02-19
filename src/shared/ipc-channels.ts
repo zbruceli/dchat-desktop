@@ -29,6 +29,10 @@ export const IPC = {
     LIST: "contact:list",
     GET: "contact:get",
     DELETE: "contact:delete",
+    UPDATE: "contact:update",
+    PICK_AVATAR: "contact:pickAvatar",
+    SET_AVATAR: "contact:setAvatar",
+    ON_UPDATE: "contact:onUpdate",
   },
   WALLET: {
     CREATE: "wallet:create",
@@ -38,6 +42,8 @@ export const IPC = {
     SAVE_SEED: "wallet:saveSeed",
     LOAD_SEED: "wallet:loadSeed",
     CLEAR_SEED: "wallet:clearSeed",
+    TRANSFER: "wallet:transfer",
+    ADDRESS_FROM_CLIENT: "wallet:addressFromClient",
   },
   CLIENT_EXTRA: {
     ECHO_TEST: "client:echoTest",

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, net, shell } from "electron";
 import path from "path";
 import { pathToFileURL } from "url";
 import { initDatabase, closeDatabase } from "./db/database";
@@ -15,6 +15,7 @@ import { AudioService } from "./services/audio-service";
 import { FileService } from "./services/file-service";
 import { TopicService } from "./services/topic-service";
 import { ProfileService } from "./services/profile-service";
+import { ContactProfileService } from "./services/contact-profile-service";
 import { TopicRepository } from "./db/repositories/topic-repository";
 import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
 import { registerAllHandlers } from "./ipc/register-all";
@@ -45,6 +46,14 @@ function createWindow(): BrowserWindow {
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../renderer/index.html"));
   }
+
+  // Open external links in the system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -182,9 +191,19 @@ app.whenReady().then(() => {
   topicService.setFileService(fileService);
   chatService.setTopicService(topicService);
 
-  const contactService = new ContactService(contactRepo);
+  const contactService = new ContactService(contactRepo, userDataPath);
   const sessionService = new SessionService(sessionRepo);
   const profileService = new ProfileService(db, userDataPath, pushToRenderer);
+
+  const contactProfileService = new ContactProfileService(
+    nknClient,
+    profileService,
+    contactRepo,
+    sessionRepo,
+    pushToRenderer,
+    userDataPath,
+  );
+  chatService.setContactProfileService(contactProfileService);
 
   // 7. Register IPC handlers
   registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService, profileService });

@@ -4,6 +4,7 @@ import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
 import type { FileService } from "./file-service";
 import type { TopicService } from "./topic-service";
+import type { ContactProfileService } from "./contact-profile-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
@@ -33,6 +34,7 @@ export class ChatService {
   private audioService: AudioService | null = null;
   private fileService: FileService | null = null;
   private topicService: TopicService | null = null;
+  private contactProfileService: ContactProfileService | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -103,6 +105,10 @@ export class ChatService {
     this.topicService = topicService;
   }
 
+  setContactProfileService(service: ContactProfileService): void {
+    this.contactProfileService = service;
+  }
+
   async sendImageMessage(to: string, filePath: string): Promise<Message> {
     if (!this.imageService) throw new Error("Image service not configured");
 
@@ -157,6 +163,9 @@ export class ChatService {
       );
 
       // Step 2: Send NKN notification (fire-and-forget, don't wait for ACK)
+      const profileVersion = this.contactProfileService?.getMyProfileVersion();
+      if (profileVersion) options.profileVersion = profileVersion;
+
       const messageData: MessageData = {
         id: messageId,
         contentType: "ipfs",
@@ -228,11 +237,15 @@ export class ChatService {
       this.pushToRenderer("chat:onMessage", { ...message });
 
       // Build NKN message data and send inline with ACK
+      const profileVersion = this.contactProfileService?.getMyProfileVersion();
+      const audioOptions = { ...result.options };
+      if (profileVersion) audioOptions.profileVersion = profileVersion;
+
       const messageData: MessageData = {
         id: messageId,
         contentType: "audio",
         content: result.content,
-        options: result.options,
+        options: audioOptions,
         timestamp: now,
       };
 
@@ -292,11 +305,15 @@ export class ChatService {
 
       this.pushToRenderer("chat:onMessage", { ...message });
 
+      const profileVersion = this.contactProfileService?.getMyProfileVersion();
+      const fileOptions = { ...result.options };
+      if (profileVersion) fileOptions.profileVersion = profileVersion;
+
       const messageData: MessageData = {
         id: messageId,
         contentType: "ipfs",
         content: result.content,
-        options: result.options,
+        options: fileOptions,
         timestamp: now,
       };
 
@@ -321,10 +338,12 @@ export class ChatService {
 
     const session = this.getOrCreateSession(params.to, myAddress);
 
+    const profileVersion = this.contactProfileService?.getMyProfileVersion();
     const messageData: MessageData = {
       id: crypto.randomUUID(),
       contentType: params.contentType ?? "text",
       content: params.content,
+      options: profileVersion ? { profileVersion } : undefined,
       timestamp: now,
     };
 
@@ -385,7 +404,13 @@ export class ChatService {
       return;
     }
 
-    // Skip non-displayable message types (ping, receipt, contact, device:*, read, etc.)
+    // Route contact profile exchange messages
+    if (contentType === "contact" && this.contactProfileService) {
+      this.contactProfileService.handleContactMessage(src, messageData);
+      return;
+    }
+
+    // Skip non-displayable message types (ping, receipt, device:*, read, etc.)
     if (!DISPLAYABLE_TYPES.has(contentType)) {
       return;
     }
@@ -407,17 +432,6 @@ export class ChatService {
     if (!myAddress) return;
 
     const session = this.getOrCreateSession(src, myAddress);
-
-    // Auto-create contact if unknown
-    if (!this.contactRepo.findByAddress(src)) {
-      const now = Date.now();
-      this.contactRepo.upsert({
-        address: src,
-        name: src.substring(0, 8) + "...",
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
 
     const now = Date.now();
     const content = messageData.content ?? "";
@@ -463,6 +477,11 @@ export class ChatService {
 
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
+
+    // Check if sender's profile version changed (direct messages only)
+    if (this.contactProfileService) {
+      this.contactProfileService.checkAndRequestProfile(src, messageData);
+    }
 
     // Handle inline audio (contentType "audio" with base64 content)
     if (isAudio && this.audioService && content) {

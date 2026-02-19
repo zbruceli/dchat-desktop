@@ -8,7 +8,7 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat are complete. The app is a functional decentralized messenger with full image, voice, file, and group chat support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, and interoperate with nMobile.
+Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 public group chat, and Phase 4 NKN wallet are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, and wallet support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, send/receive NKN tokens, and interoperate with nMobile.
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
@@ -38,6 +38,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
+- **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
 - **Connection status** — Avatar circle with green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
@@ -47,7 +48,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 ### What's not yet built
 - SQLCipher encryption (currently plain SQLite — swap `better-sqlite3` for `better-sqlite3-multiple-ciphers`)
 - Electron safeStorage for private key persistence
-- Wallet page UI (placeholder screen)
+- ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - Message receipts (delivered/read status)
 - Video sharing
 - Private groups (off-chain, signature-based membership)
@@ -115,7 +116,7 @@ dchat/
 │   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages/sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-handlers.ts  # ✅ contact:add/list/get/delete
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
-│   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import (NKN SDK)
+│   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import/transfer/addressFromClient (NKN SDK)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
 │   │   │   └── profile-handlers.ts # ✅ profile:get/setNickname/pickAvatar/setAvatar
@@ -162,7 +163,7 @@ dchat/
 │   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import/restore wallet + connect
 │   │   │   ├── Chat/ChatPage.tsx    # ✅ Two-panel: session list + message thread
 │   │   │   ├── Contacts/ContactsPage.tsx # ✅ Contact list + add form
-│   │   │   ├── Wallet/              # Placeholder
+│   │   │   ├── Wallet/WalletPage.tsx # ✅ Balance display, send NKN (with contact picker), receive addresses, echo test
 │   │   │   └── Settings/SettingsPage.tsx # ✅ Profile editing (avatar + nickname) + IPFS gateway configuration
 │   │   ├── components/
 │   │   │   ├── chat/
@@ -279,7 +280,7 @@ Security: contextIsolation is enabled, nodeIntegration is disabled. The renderer
 13. **Subscriber Management** — Track subscription expiry, permission pages for private topics
 
 ### Phase 4: Wallet & Polish
-14. **NKN Wallet** — Create, import (keystore/seed), export, send/receive NKN tokens
+14. **NKN Wallet** — Create, import (keystore/seed), export, send/receive NKN tokens **Implemented.**
 15. **ETH Wallet** — ERC-20 token support, balance queries
 16. **Multi-device Sync** — Queue-based message synchronization across devices
 17. **Desktop Notifications** — Native OS notifications for new messages

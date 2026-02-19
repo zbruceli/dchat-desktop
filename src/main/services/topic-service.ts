@@ -163,19 +163,6 @@ export class TopicService {
     // Update member count
     this.topicRepo.setMemberCount(topicName, addresses.length);
 
-    // Auto-create contacts for unknown subscribers
-    const now = Date.now();
-    for (const addr of addresses) {
-      if (!this.contactRepo.findByAddress(addr)) {
-        this.contactRepo.upsert({
-          address: addr,
-          name: addr.substring(0, 8) + "...",
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
-
     return addresses;
   }
 
@@ -500,17 +487,6 @@ export class TopicService {
       const count = this.subscriberRepo.findByTopicId(topicName).length;
       this.topicRepo.setMemberCount(topicName, count);
 
-      // Auto-create contact
-      if (!this.contactRepo.findByAddress(src)) {
-        const now = Date.now();
-        this.contactRepo.upsert({
-          address: src,
-          name: src.substring(0, 8) + "...",
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-
       console.log(`[TopicService] ${src} joined topic "${topicName}" (${count} members)`);
     } else if (messageData.contentType === "topic:unsubscribe") {
       // Remove subscriber
@@ -545,17 +521,6 @@ export class TopicService {
 
     // Ensure topic session exists
     this.getOrCreateTopicSession(topicName);
-
-    // Auto-create contact for sender
-    if (!this.contactRepo.findByAddress(src)) {
-      const now = Date.now();
-      this.contactRepo.upsert({
-        address: src,
-        name: src.substring(0, 8) + "...",
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
 
     const now = Date.now();
     const content = messageData.content ?? "";
