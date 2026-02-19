@@ -7,6 +7,7 @@ import type {
   ClientStatus,
   Topic,
   TopicSubscriber,
+  Profile,
 } from "../shared/types";
 
 const api = {
@@ -148,6 +149,22 @@ const api = {
         callback(topicId);
       ipcRenderer.on("topic:onDelete", handler);
       return () => ipcRenderer.removeListener("topic:onDelete", handler);
+    },
+  },
+  profile: {
+    get: (): Promise<Profile> =>
+      ipcRenderer.invoke("profile:get"),
+    setNickname: (nickname: string): Promise<Profile> =>
+      ipcRenderer.invoke("profile:setNickname", nickname),
+    pickAvatar: (): Promise<string | null> =>
+      ipcRenderer.invoke("profile:pickAvatar"),
+    setAvatar: (filePath: string): Promise<Profile> =>
+      ipcRenderer.invoke("profile:setAvatar", filePath),
+    onUpdate: (callback: (profile: Profile) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, profile: Profile) =>
+        callback(profile);
+      ipcRenderer.on("profile:onUpdate", handler);
+      return () => ipcRenderer.removeListener("profile:onUpdate", handler);
     },
   },
 };

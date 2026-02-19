@@ -17,3 +17,5 @@ export type { WalletInfo, CreateWalletParams, ImportWalletParams } from "./walle
 export type { ClientStatus } from "./client";
 
 export type { Topic, TopicSubscriber } from "./topic";
+
+export type { Profile } from "./profile";

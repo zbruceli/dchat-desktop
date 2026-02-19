@@ -26,9 +26,10 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **Contact management** — Add/delete contacts by NKN address, auto-create contacts for unknown senders (`src/main/services/contact-service.ts`)
 - **SQLite database** — `better-sqlite3` with WAL mode, foreign keys, version-based migrations (`src/main/db/`)
 - **Repository pattern** — MessageRepository, ContactRepository, SessionRepository, TopicRepository, TopicSubscriberRepository with typed row mapping
-- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic (`src/main/ipc/`)
+- **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page (`src/main/services/profile-service.ts`)
+- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
-- **Zustand stores** — Client, chat, contact, session, topic stores with IPC subscription hooks (`src/renderer/stores/`)
+- **Zustand stores** — Client, chat, contact, session, topic, profile stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
@@ -36,10 +37,10 @@ Phase 1 (Foundation), Phase 2 (rich messaging), and Phase 3 public group chat ar
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
-- **Settings UI** — IPFS gateway configuration (host/port) (`src/renderer/pages/Settings/SettingsPage.tsx`)
+- **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
-- **Connection status** — Green/yellow/red dot indicator with address display and disconnect button
-- **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus (`src/shared/types/`)
+- **Connection status** — Avatar circle with green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
+- **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
 - **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service
 
@@ -116,7 +117,8 @@ dchat/
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import (NKN SDK)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
-│   │   │   └── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
+│   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
+│   │   │   └── profile-handlers.ts # ✅ profile:get/setNickname/pickAvatar/setAvatar
 │   │   ├── services/                # Business logic (mirrors nMobile common/)
 │   │   │   ├── nkn-client-service.ts # ✅ NKN MultiClient wrapper, connect/send/sendNoReply/subscribe/unsubscribe/getSubscribers/sendToMultiple
 │   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image + audio + file messaging, topic message routing
@@ -126,7 +128,8 @@ dchat/
 │   │   │   ├── file-service.ts      # ✅ Generic file encrypt, IPFS upload/download, cache in file-cache/
 │   │   │   ├── ipfs-service.ts      # ✅ IPFS HTTP API upload/download, multi-gateway fallback
 │   │   │   ├── contact-service.ts   # ✅ Contact CRUD wrapper
-│   │   │   └── session-service.ts   # ✅ Session CRUD wrapper
+│   │   │   ├── session-service.ts   # ✅ Session CRUD wrapper
+│   │   │   └── profile-service.ts   # ✅ Avatar resize (200x200 JPEG), nickname/avatar persistence, profile version UUID
 │   │   ├── db/                      # Data access layer
 │   │   │   ├── database.ts          # ✅ SQLite singleton (init/get/close, WAL, FK)
 │   │   │   ├── migrations/
@@ -153,13 +156,14 @@ dchat/
 │   │   │   ├── chat-store.ts        # ✅ Messages by session, send/load/incoming, sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-store.ts     # ✅ Contact list, add/delete
 │   │   │   ├── session-store.ts     # ✅ Session list, real-time updates, delete events
-│   │   │   └── topic-store.ts       # ✅ Topic list, create/join/leave, subscriber fetch, real-time updates
+│   │   │   ├── topic-store.ts       # ✅ Topic list, create/join/leave, subscriber fetch, real-time updates
+│   │   │   └── profile-store.ts    # ✅ Profile state, load/setNickname/pickAndSetAvatar, push event updates
 │   │   ├── pages/
 │   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import/restore wallet + connect
 │   │   │   ├── Chat/ChatPage.tsx    # ✅ Two-panel: session list + message thread
 │   │   │   ├── Contacts/ContactsPage.tsx # ✅ Contact list + add form
 │   │   │   ├── Wallet/              # Placeholder
-│   │   │   └── Settings/SettingsPage.tsx # ✅ IPFS gateway configuration
+│   │   │   └── Settings/SettingsPage.tsx # ✅ Profile editing (avatar + nickname) + IPFS gateway configuration
 │   │   ├── components/
 │   │   │   ├── chat/
 │   │   │   │   ├── SessionList.tsx  # ✅ Conversation list with previews + unread badges
@@ -171,7 +175,7 @@ dchat/
 │   │   │   │   ├── VoiceRecordButton.tsx # ✅ Click-to-record mic button (0.5s–60s, cancel, send)
 │   │   │   │   └── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
 │   │   │   └── common/
-│   │   │       └── ConnectionStatus.tsx # ✅ Green/yellow/red dot + address
+│   │   │       └── ConnectionStatus.tsx # ✅ Avatar circle + status dot overlay + nickname + profile editing popover
 │   │   ├── hooks/
 │   │   │   └── use-ipc-subscriptions.ts # ✅ Push-event subscriptions on mount
 │   │   └── styles/
@@ -184,7 +188,8 @@ dchat/
 │   │   │   ├── session.ts           # ✅ Session, SessionType
 │   │   │   ├── wallet.ts            # ✅ WalletInfo, CreateWalletParams, ImportWalletParams
 │   │   │   ├── client.ts            # ✅ ClientStatus
-│   │   │   └── topic.ts             # ✅ Topic, TopicSubscriber
+│   │   │   ├── topic.ts             # ✅ Topic, TopicSubscriber
+│   │   │   └── profile.ts          # ✅ Profile (nickname, avatarPath, profileVersion)
 │   │   ├── constants.ts             # ✅ App constants, NKN seed servers
 │   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. TOPIC section, session/topic delete events)
 │   └── preload/

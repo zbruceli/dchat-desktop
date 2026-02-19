@@ -68,4 +68,11 @@ export const IPC = {
     ON_UPDATE: "topic:onUpdate",
     ON_DELETE: "topic:onDelete",
   },
+  PROFILE: {
+    GET: "profile:get",
+    SET_NICKNAME: "profile:setNickname",
+    PICK_AVATAR: "profile:pickAvatar",
+    SET_AVATAR: "profile:setAvatar",
+    ON_UPDATE: "profile:onUpdate",
+  },
 } as const;

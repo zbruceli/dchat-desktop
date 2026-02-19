@@ -34,7 +34,8 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Persistent storage** — SQLite database for message history, contacts, sessions, and settings
 - **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
 - **Auth gate** — Login page when disconnected, full app when connected
-- **Settings page** — IPFS gateway configuration (host/port)
+- **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
+- **Settings page** — Profile editing (nickname + avatar) and IPFS gateway configuration
 - **Dark theme UI** — Tailwind CSS dark theme with chat bubbles, session list, and contact management
 - Hot-reload development environment
 
@@ -113,7 +114,8 @@ src/
 │   │   ├── file-service.ts         Generic file encrypt, IPFS upload/download, cache
 │   │   ├── ipfs-service.ts         IPFS HTTP API upload/download, multi-gateway
 │   │   ├── contact-service.ts      Contact CRUD
-│   │   └── session-service.ts      Session CRUD
+│   │   ├── session-service.ts      Session CRUD
+│   │   └── profile-service.ts      Avatar resize, nickname persistence
 │   ├── db/              SQLite database layer
 │   │   ├── database.ts             Singleton (init/get/close, WAL, FK)
 │   │   ├── migrations/             Version-based schema migrations (001–003)
@@ -125,7 +127,7 @@ src/
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
 │   ├── pages/           Login, Chat (two-panel), Contacts, Settings
 │   ├── components/      Chat bubbles, image display, lightbox, file display, session list, message input
-│   ├── stores/          Zustand stores (client, chat, contact, session)
+│   ├── stores/          Zustand stores (client, chat, contact, session, profile)
 │   └── hooks/           IPC push-event subscriptions
 ├── shared/            Code shared between main and renderer
 │   ├── types/           TypeScript interfaces (Message, Contact, Session, etc.)

@@ -14,6 +14,7 @@ import { ImageService } from "./services/image-service";
 import { AudioService } from "./services/audio-service";
 import { FileService } from "./services/file-service";
 import { TopicService } from "./services/topic-service";
+import { ProfileService } from "./services/profile-service";
 import { TopicRepository } from "./db/repositories/topic-repository";
 import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
 import { registerAllHandlers } from "./ipc/register-all";
@@ -183,9 +184,10 @@ app.whenReady().then(() => {
 
   const contactService = new ContactService(contactRepo);
   const sessionService = new SessionService(sessionRepo);
+  const profileService = new ProfileService(db, userDataPath, pushToRenderer);
 
   // 7. Register IPC handlers
-  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService });
+  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService, profileService });
 
   // App info handler
   ipcMain.handle(IPC.APP.GET_INFO, () => ({

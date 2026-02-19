@@ -1,7 +1,100 @@
 import React, { useState, useEffect } from "react";
+import { useProfileStore } from "../../stores/profile-store";
 
 interface IpfsConfig {
   gateways?: { host: string; port: number; protocol: string; authHeader?: string }[];
+}
+
+function ProfileSection() {
+  const profile = useProfileStore((s) => s.profile);
+  const loadProfile = useProfileStore((s) => s.loadProfile);
+  const setNickname = useProfileStore((s) => s.setNickname);
+  const pickAndSetAvatar = useProfileStore((s) => s.pickAndSetAvatar);
+  const [nicknameValue, setNicknameValue] = useState("");
+  const [nicknameSaved, setNicknameSaved] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (profile) {
+      setNicknameValue(profile.nickname);
+    }
+  }, [profile]);
+
+  async function handleSaveNickname() {
+    const trimmed = nicknameValue.trim();
+    if (trimmed !== (profile?.nickname || "")) {
+      await setNickname(trimmed);
+    }
+    setNicknameSaved(true);
+    setTimeout(() => setNicknameSaved(false), 2000);
+  }
+
+  const avatarSrc = profile?.avatarPath
+    ? `dchat-media://profile-cache/${profile.avatarPath}?v=${profile.profileVersion}`
+    : null;
+
+  const initials = profile?.nickname
+    ? profile.nickname.charAt(0).toUpperCase()
+    : "?";
+
+  return (
+    <section className="max-w-lg mb-8">
+      <h2 className="text-sm font-medium text-gray-300 mb-4">Profile</h2>
+
+      <div className="flex items-start gap-4 mb-4">
+        <div className="flex flex-col items-center gap-2">
+          <div
+            className="w-20 h-20 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden bg-primary-700 text-white text-2xl font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={pickAndSetAvatar}
+            title="Click to change avatar"
+          >
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt="Avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </div>
+          <button
+            onClick={pickAndSetAvatar}
+            className="text-[11px] text-primary-400 hover:text-primary-300 transition-colors"
+          >
+            Change
+          </button>
+        </div>
+
+        <div className="flex-1">
+          <label className="block mb-4">
+            <span className="text-xs text-gray-400 mb-1 block">Nickname</span>
+            <input
+              type="text"
+              value={nicknameValue}
+              onChange={(e) => setNicknameValue(e.target.value)}
+              onBlur={handleSaveNickname}
+              onKeyDown={(e) => e.key === "Enter" && handleSaveNickname()}
+              placeholder="Set your display name"
+              maxLength={64}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+            />
+          </label>
+          {nicknameSaved && (
+            <span className="text-[11px] text-green-400">Saved!</span>
+          )}
+          {profile?.profileVersion && (
+            <div className="text-[10px] text-gray-600 mt-2">
+              Profile version: {profile.profileVersion.substring(0, 8)}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function SettingsPage() {
@@ -52,6 +145,8 @@ export function SettingsPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <h1 className="text-xl font-semibold text-gray-200 mb-6">Settings</h1>
+
+      <ProfileSection />
 
       <section className="max-w-lg">
         <h2 className="text-sm font-medium text-gray-300 mb-4">IPFS Configuration</h2>
