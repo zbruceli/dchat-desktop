@@ -21,8 +21,8 @@ function permLabel(perm: number): string {
 
 function permColor(perm: number): string {
   if (perm === PrivateGroupItemPerm.OWNER) return "text-amber-400";
-  if (perm === PrivateGroupItemPerm.ADMIN) return "text-blue-400";
-  return "text-gray-500";
+  if (perm === PrivateGroupItemPerm.ADMIN) return "text-accent-400";
+  return "text-text-faint";
 }
 
 export function PrivateGroupMemberPanel({
@@ -95,14 +95,14 @@ export function PrivateGroupMemberPanel({
   }
 
   return (
-    <div className="w-56 border-l border-gray-800 flex flex-col min-h-0 bg-gray-900/50">
-      <div className="px-3 py-2.5 border-b border-gray-800 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-300">
+    <div className="w-56 border-l border-surface-border flex flex-col min-h-0 bg-surface-deep">
+      <div className="px-3 py-2.5 border-b border-surface-border flex items-center justify-between">
+        <span className="text-xs font-semibold text-text-secondary">
           Members ({activeMembers.length})
         </span>
         <button
           onClick={onClose}
-          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors"
+          className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
           title="Close"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +113,7 @@ export function PrivateGroupMemberPanel({
 
       {/* Invite input (owner/admin only) */}
       {isAdmin && (
-        <div className="px-3 py-2 border-b border-gray-800">
+        <div className="px-3 py-2 border-b border-surface-border">
           <input
             type="text"
             placeholder="Invite NKN address..."
@@ -122,7 +122,7 @@ export function PrivateGroupMemberPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleInvite();
             }}
-            className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[10px] text-gray-200 placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-mono"
+            className="w-full px-2 py-1 bg-surface-raised border border-surface-border rounded text-[10px] text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 font-mono"
             disabled={inviting}
           />
           <button
@@ -138,26 +138,26 @@ export function PrivateGroupMemberPanel({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <span className="text-xs text-gray-500">Loading...</span>
+            <span className="text-xs text-text-muted">Loading...</span>
           </div>
         ) : activeMembers.length === 0 ? (
           <div className="flex items-center justify-center py-8">
-            <span className="text-xs text-gray-500">No members</span>
+            <span className="text-xs text-text-muted">No members</span>
           </div>
         ) : (
           <div className="py-1">
             {activeMembers.map((member) => (
               <div
                 key={member.invitee}
-                className="px-3 py-1.5 flex items-center gap-2 hover:bg-gray-800/50 group"
+                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50 group"
               >
-                <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[9px] text-gray-300">
+                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
+                  <span className="text-[9px] text-text-secondary">
                     {member.invitee.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-300 truncate block" title={member.invitee}>
+                  <span className="text-xs text-text-secondary truncate block" title={member.invitee}>
                     {getDisplayName(member.invitee)}
                   </span>
                   <span className={`text-[9px] ${permColor(member.permission)}`}>

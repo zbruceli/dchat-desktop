@@ -33,8 +33,9 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
+- **Slack-style UI** — Flat message rows with avatars (no colored bubbles), three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
-- **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
+- **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal with backdrop blur, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
@@ -44,7 +45,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
 - **Error boundary** — React ErrorBoundary catches rendering crashes and displays error details with a retry button (`src/renderer/App.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
-- **Connection status** — Avatar circle with green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
+- **Connection status** — Avatar with rounded-lg shape, green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
 - **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service

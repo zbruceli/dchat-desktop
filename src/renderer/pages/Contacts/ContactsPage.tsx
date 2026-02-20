@@ -75,8 +75,8 @@ export function ContactsPage() {
       {/* Left panel: add form + search + list */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Add contact form */}
-        <div className="p-4 border-b border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-300 mb-3">Add Contact</h2>
+        <div className="p-4 border-b border-surface-border">
+          <h2 className="text-sm font-semibold text-text-secondary mb-3">Add Contact</h2>
           {error && (
             <div className="mb-3 p-2 rounded bg-red-900/30 border border-red-800 text-red-300 text-xs">
               {error}
@@ -88,7 +88,7 @@ export function ContactsPage() {
               placeholder="NKN address"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 text-sm font-mono"
+              className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm font-mono"
             />
             <div className="flex gap-2">
               <input
@@ -96,11 +96,11 @@ export function ContactsPage() {
                 placeholder="Display name (optional)"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 text-sm"
+                className="flex-1 px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm"
               />
               <button
                 onClick={handleAdd}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Add
               </button>
@@ -109,10 +109,10 @@ export function ContactsPage() {
         </div>
 
         {/* Search + Sort bar */}
-        <div className="px-4 py-2 border-b border-gray-800 flex items-center gap-2">
+        <div className="px-4 py-2 border-b border-surface-border flex items-center gap-2">
           <div className="flex-1 relative">
             <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-faint"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -129,12 +129,12 @@ export function ContactsPage() {
               placeholder="Search contacts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 text-xs"
+              className="w-full pl-8 pr-3 py-1.5 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-xs"
             />
           </div>
           <button
             onClick={cycleSortMode}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors whitespace-nowrap"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-surface-hover rounded-lg transition-colors whitespace-nowrap"
             title={`Sort: ${sortMode === "name" ? "A-Z" : "Recent"}`}
           >
             <SortIcon />
@@ -146,14 +146,14 @@ export function ContactsPage() {
         <div className="flex-1 overflow-y-auto">
           {displayedContacts.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-text-muted">
                 {contacts.length === 0
                   ? "No contacts yet"
                   : "No matching contacts"}
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-800">
+            <div className="divide-y divide-surface-border">
               {displayedContacts.map((contact) => {
                 const isSelected = selectedAddress === contact.address;
                 const avatarUrl = contact.avatarUri
@@ -166,11 +166,11 @@ export function ContactsPage() {
                     onClick={() => setSelectedAddress(contact.address)}
                     className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
                       isSelected
-                        ? "bg-primary-900/20 border-l-2 border-primary-500"
-                        : "hover:bg-gray-800/50 border-l-2 border-transparent"
+                        ? "bg-accent-500/10 border-l-2 border-accent-500"
+                        : "hover:bg-surface-hover/50 border-l-2 border-transparent"
                     }`}
                   >
-                    <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <div className="w-9 h-9 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {avatarUrl ? (
                         <img
                           src={avatarUrl}
@@ -178,14 +178,14 @@ export function ContactsPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="text-sm text-gray-300">
+                        <span className="text-sm text-text-secondary">
                           {contact.name.charAt(0).toUpperCase()}
                         </span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm text-gray-200 truncate">{contact.name}</div>
-                      <div className="text-[10px] text-gray-500 font-mono truncate">
+                      <div className="text-sm text-text-primary truncate">{contact.name}</div>
+                      <div className="text-[10px] text-text-faint font-mono truncate">
                         {contact.address}
                       </div>
                     </div>

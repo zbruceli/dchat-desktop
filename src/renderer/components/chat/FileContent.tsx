@@ -55,10 +55,10 @@ export function FileContent({ message }: { message: Message }) {
   if (message.isOutbound && message.status === "sending") {
     return (
       <div className="flex items-center gap-3 py-1">
-        <DocIcon className="w-8 h-8 text-gray-400 flex-shrink-0" />
+        <DocIcon className="w-8 h-8 text-text-muted flex-shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm truncate">{fileName}</p>
-          <p className="text-xs text-gray-400">Uploading...</p>
+          <p className="text-sm text-text-primary truncate">{fileName}</p>
+          <p className="text-xs text-text-muted">Uploading...</p>
         </div>
       </div>
     );
@@ -70,7 +70,7 @@ export function FileContent({ message }: { message: Message }) {
       <div className="flex items-center gap-3 py-1">
         <DocIcon className="w-8 h-8 text-red-400 flex-shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm truncate">{fileName}</p>
+          <p className="text-sm text-text-primary truncate">{fileName}</p>
           <p className="text-xs text-red-400">Send failed</p>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function FileContent({ message }: { message: Message }) {
       >
         <DocIcon className="w-8 h-8 text-yellow-400 flex-shrink-0" />
         <div className="min-w-0 text-left">
-          <p className="text-sm truncate">{fileName}</p>
+          <p className="text-sm text-text-primary truncate">{fileName}</p>
           <p className="text-xs text-yellow-400">Tap to retry</p>
         </div>
       </button>
@@ -97,9 +97,9 @@ export function FileContent({ message }: { message: Message }) {
   if (!message.isOutbound && !hasEncryptionKeys(opts)) {
     return (
       <div className="flex items-center gap-3 py-1">
-        <DocIcon className="w-8 h-8 text-gray-500 flex-shrink-0" />
+        <DocIcon className="w-8 h-8 text-text-faint flex-shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm text-gray-400">File unavailable</p>
+          <p className="text-sm text-text-muted">File unavailable</p>
         </div>
       </div>
     );
@@ -112,10 +112,10 @@ export function FileContent({ message }: { message: Message }) {
         onClick={() => openFile(message.localFilePath!)}
         className="flex items-center gap-3 py-1 cursor-pointer hover:opacity-80 transition-opacity"
       >
-        <DocIcon className="w-8 h-8 text-blue-400 flex-shrink-0" />
+        <DocIcon className="w-8 h-8 text-accent-400 flex-shrink-0" />
         <div className="min-w-0 text-left">
-          <p className="text-sm truncate">{fileName}</p>
-          {fileSize && <p className="text-xs text-gray-400">{fileSize}</p>}
+          <p className="text-sm text-text-primary truncate">{fileName}</p>
+          {fileSize && <p className="text-xs text-text-muted">{fileSize}</p>}
         </div>
       </button>
     );
@@ -127,10 +127,10 @@ export function FileContent({ message }: { message: Message }) {
       onClick={() => downloadFile(message.id)}
       className="flex items-center gap-3 py-1 cursor-pointer hover:opacity-80 transition-opacity"
     >
-      <DocIcon className="w-8 h-8 text-gray-400 flex-shrink-0" />
+      <DocIcon className="w-8 h-8 text-text-muted flex-shrink-0" />
       <div className="min-w-0 text-left">
-        <p className="text-sm truncate">{fileName}</p>
-        <p className="text-xs text-gray-400">
+        <p className="text-sm text-text-primary truncate">{fileName}</p>
+        <p className="text-xs text-text-muted">
           {fileSize ? `${fileSize} — Tap to download` : "Downloading..."}
         </p>
       </div>

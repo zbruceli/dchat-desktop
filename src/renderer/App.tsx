@@ -42,16 +42,16 @@ export function App() {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <nav className="flex flex-col w-16 bg-sidebar-bg border-r border-gray-800">
+      <nav className="flex flex-col w-14 bg-surface-deepest">
         <div className="flex-1 flex flex-col items-center pt-4 gap-2">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveNav(item.id)}
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+              className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
                 activeNav === item.id
-                  ? "bg-primary-600 text-white"
-                  : "text-gray-400 hover:bg-sidebar-hover hover:text-gray-200"
+                  ? "bg-accent-500/20 text-white"
+                  : "text-text-muted hover:bg-surface-hover/50 hover:text-text-primary"
               }`}
               title={item.label}
             >
@@ -65,12 +65,12 @@ export function App() {
           <ConnectionStatus />
           <button
             onClick={disconnect}
-            className="text-[10px] text-gray-500 hover:text-red-400 transition-colors"
+            className="text-[10px] text-text-faint hover:text-red-400 transition-colors"
           >
             Disconnect
           </button>
           {appInfo && (
-            <div className="mt-1 text-[10px] text-gray-600">
+            <div className="mt-1 text-[10px] text-text-faint">
               v{appInfo.version}
             </div>
           )}
@@ -112,12 +112,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center max-w-lg">
             <h2 className="text-lg font-semibold text-red-400 mb-2">Something went wrong</h2>
-            <pre className="text-xs text-gray-400 bg-gray-900 p-4 rounded overflow-auto max-h-40 text-left">
+            <pre className="text-xs text-text-secondary bg-surface-raised p-4 rounded overflow-auto max-h-40 text-left">
               {this.state.error.message}{"\n"}{this.state.error.stack}
             </pre>
             <button
               onClick={() => this.setState({ error: null })}
-              className="mt-4 px-4 py-2 bg-primary-600 text-white text-sm rounded"
+              className="mt-4 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm rounded"
             >
               Try Again
             </button>
@@ -133,8 +133,8 @@ function PlaceholderPage({ title, description }: { title: string; description: s
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold text-gray-200 mb-2">{title}</h1>
-        <p className="text-gray-500">{description}</p>
+        <h1 className="text-2xl font-semibold text-text-primary mb-2">{title}</h1>
+        <p className="text-text-muted">{description}</p>
       </div>
     </div>
   );

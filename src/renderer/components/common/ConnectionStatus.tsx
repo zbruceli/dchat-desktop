@@ -13,14 +13,14 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 
   return (
     <div className="space-y-1">
-      <div className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wide">{label}</div>
       <div className="flex items-center gap-1.5">
-        <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-800 rounded text-[11px] text-gray-300 font-mono truncate select-all">
+        <div className="flex-1 min-w-0 px-2 py-1.5 bg-surface-raised rounded text-[11px] text-text-secondary font-mono truncate select-all">
           {value}
         </div>
         <button
           onClick={handleCopy}
-          className="flex-shrink-0 px-2 py-1.5 text-[10px] rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
+          className="flex-shrink-0 px-2 py-1.5 text-[10px] rounded bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
           title="Copy to clipboard"
         >
           {copied ? "Copied!" : "Copy"}
@@ -50,12 +50,12 @@ function EchoTest() {
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Network Test</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wide">Network Test</div>
       <div className="flex items-center gap-2">
         <button
           onClick={handleTest}
           disabled={testing}
-          className="px-3 py-1.5 text-[11px] rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 transition-colors"
+          className="px-3 py-1.5 text-[11px] rounded bg-surface-raised hover:bg-surface-hover disabled:opacity-50 text-text-secondary transition-colors"
         >
           {testing ? "Testing..." : "Echo Test"}
         </button>
@@ -91,7 +91,7 @@ function AvatarCircle({ size, onClick }: { size: number; onClick?: () => void })
 
   return (
     <div
-      className={`${sizeClass} rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden bg-primary-700 text-white font-semibold ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
+      className={`${sizeClass} rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-accent-700 text-white font-semibold ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
       onClick={onClick}
       title={onClick ? "Change avatar" : undefined}
     >
@@ -184,27 +184,27 @@ export function ConnectionStatus() {
       <button
         onClick={() => isConnected && setOpen(!open)}
         className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded transition-colors ${
-          isConnected ? "hover:bg-gray-800 cursor-pointer" : "cursor-default"
+          isConnected ? "hover:bg-surface-hover/50 cursor-pointer" : "cursor-default"
         }`}
         title={isConnected ? "Click to view profile" : status.state}
       >
         <div className="relative">
           <AvatarCircle size={32} />
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-sidebar-bg ${dotColor}`} />
+          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface-deepest ${dotColor}`} />
         </div>
-        <span className="text-[10px] text-gray-400 truncate max-w-[56px]">{displayName}</span>
+        <span className="text-[10px] text-text-muted truncate max-w-[48px]">{displayName}</span>
       </button>
 
       {open && isConnected && (
-        <div className="absolute bottom-full left-0 mb-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 space-y-3 z-50">
-          <div className="text-xs font-semibold text-gray-300">Your Identity</div>
+        <div className="absolute bottom-full left-0 mb-2 w-72 bg-surface-base border border-surface-border rounded-lg shadow-xl p-3 space-y-3 z-50">
+          <div className="text-xs font-semibold text-text-secondary">Your Identity</div>
 
           {/* Avatar + Nickname editing */}
           <div className="flex items-center gap-3">
             <div className="relative group">
               <AvatarCircle size={64} onClick={pickAndSetAvatar} />
               <div
-                className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                className="absolute inset-0 rounded-lg bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={pickAndSetAvatar}
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,16 +224,16 @@ export function ConnectionStatus() {
                   onKeyDown={handleNicknameKeyDown}
                   placeholder="Set nickname"
                   maxLength={64}
-                  className="w-full px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+                  className="w-full px-2 py-1 bg-surface-raised border border-surface-border rounded text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
                 />
               ) : (
                 <div className="flex items-center gap-1.5 group/nick">
-                  <span className="text-sm text-gray-200 truncate">
+                  <span className="text-sm text-text-primary truncate">
                     {profile?.nickname || "No nickname"}
                   </span>
                   <button
                     onClick={startEditNickname}
-                    className="flex-shrink-0 text-gray-500 hover:text-gray-300 transition-colors"
+                    className="flex-shrink-0 text-text-faint hover:text-text-secondary transition-colors"
                     title="Edit nickname"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,7 +242,7 @@ export function ConnectionStatus() {
                   </button>
                 </div>
               )}
-              <div className="text-[10px] text-gray-500 mt-0.5">
+              <div className="text-[10px] text-text-faint mt-0.5">
                 {profile?.nickname ? "Nickname" : "Click pencil to set"}
               </div>
             </div>

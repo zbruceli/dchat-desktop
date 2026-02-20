@@ -12,7 +12,7 @@ export function SessionList() {
   if (sessions.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
-        <p className="text-sm text-gray-500 text-center">
+        <p className="text-sm text-text-muted text-center">
           No conversations yet. Add a contact to start chatting.
         </p>
       </div>
@@ -42,14 +42,14 @@ export function SessionList() {
           <button
             key={session.id}
             onClick={() => setActiveSession(session.id)}
-            className={`w-full px-3 py-3 flex items-start gap-3 text-left transition-colors ${
-              isActive ? "bg-gray-800" : "hover:bg-gray-800/50"
+            className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${
+              isActive ? "bg-accent-500/10" : "hover:bg-surface-hover/50"
             }`}
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isTopic ? "bg-primary-900" : isPrivateGroup ? "bg-emerald-900" : "bg-gray-700"
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              isTopic ? "bg-accent-700/30" : isPrivateGroup ? "bg-emerald-700/30" : "bg-surface-hover"
             }`}>
-              <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : isPrivateGroup ? "text-emerald-300" : "text-gray-300"}`}>
+              <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
                 {isTopic ? "#" : isPrivateGroup ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -59,15 +59,15 @@ export function SessionList() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-200 truncate">
+                <span className="text-[13px] font-medium text-text-primary truncate">
                   {displayName}
                 </span>
-                <span className="text-[10px] text-gray-500 flex-shrink-0 ml-2">{time}</span>
+                <span className="text-[11px] text-text-muted flex-shrink-0 ml-2">{time}</span>
               </div>
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-xs text-gray-500 truncate">{preview}</span>
+                <span className="text-xs text-text-muted truncate">{preview}</span>
                 {session.unreadCount > 0 && (
-                  <span className="ml-2 flex-shrink-0 bg-primary-600 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  <span className="ml-2 flex-shrink-0 bg-badge text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {session.unreadCount > 99 ? "99+" : session.unreadCount}
                   </span>
                 )}

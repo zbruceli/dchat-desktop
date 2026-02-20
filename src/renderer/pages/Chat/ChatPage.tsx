@@ -83,13 +83,13 @@ export function ChatPage() {
   return (
     <div className="flex-1 flex min-h-0">
       {/* Session list sidebar */}
-      <div className="w-72 border-r border-gray-800 flex flex-col min-h-0">
-        <div className="px-3 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300">Chats</h2>
+      <div className="w-72 bg-surface-deep border-r border-surface-border flex flex-col min-h-0">
+        <div className="px-3 py-3 border-b border-surface-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-text-secondary">Chats</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => { setShowCreateGroup(!showCreateGroup); setShowJoinTopic(false); setShowNewChat(false); }}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
               title="Create private group"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,7 +98,7 @@ export function ChatPage() {
             </button>
             <button
               onClick={() => { setShowJoinTopic(!showJoinTopic); setShowNewChat(false); setShowCreateGroup(false); }}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
               title="Join topic"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ export function ChatPage() {
             </button>
             <button
               onClick={() => { setShowNewChat(!showNewChat); setShowJoinTopic(false); setShowCreateGroup(false); }}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
               title="New chat"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,8 +118,8 @@ export function ChatPage() {
         </div>
 
         {showCreateGroup && (
-          <div className="px-3 py-2 border-b border-gray-800 space-y-2">
-            <div className="text-[10px] text-gray-500 uppercase tracking-wide">Create Private Group</div>
+          <div className="px-3 py-2 border-b border-surface-border space-y-2">
+            <div className="text-[10px] text-text-muted uppercase tracking-wide">Create Private Group</div>
             <input
               type="text"
               placeholder="Group name"
@@ -128,7 +128,7 @@ export function ChatPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateGroup();
               }}
-              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              className="w-full px-2 py-1.5 bg-surface-raised border border-surface-border rounded-lg text-xs text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
               autoFocus
               disabled={groupCreating}
             />
@@ -143,8 +143,8 @@ export function ChatPage() {
         )}
 
         {showJoinTopic && (
-          <div className="px-3 py-2 border-b border-gray-800 space-y-2">
-            <div className="text-[10px] text-gray-500 uppercase tracking-wide">Join Topic</div>
+          <div className="px-3 py-2 border-b border-surface-border space-y-2">
+            <div className="text-[10px] text-text-muted uppercase tracking-wide">Join Topic</div>
             <input
               type="text"
               placeholder="Topic name (e.g. general)"
@@ -153,14 +153,14 @@ export function ChatPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleJoinTopic();
               }}
-              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 font-mono"
+              className="w-full px-2 py-1.5 bg-surface-raised border border-surface-border rounded-lg text-xs text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 font-mono"
               autoFocus
               disabled={topicJoining}
             />
             <button
               onClick={handleJoinTopic}
               disabled={topicJoining || !topicName.trim()}
-              className="w-full px-2 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs rounded-lg transition-colors"
+              className="w-full px-2 py-1.5 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs rounded-lg transition-colors"
             >
               {topicJoining ? "Joining..." : "Join"}
             </button>
@@ -168,7 +168,7 @@ export function ChatPage() {
         )}
 
         {showNewChat && (
-          <div className="px-3 py-2 border-b border-gray-800 space-y-2">
+          <div className="px-3 py-2 border-b border-surface-border space-y-2">
             <input
               type="text"
               placeholder="Enter NKN address..."
@@ -177,7 +177,7 @@ export function ChatPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleNewChat(newAddress);
               }}
-              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 font-mono"
+              className="w-full px-2 py-1.5 bg-surface-raised border border-surface-border rounded-lg text-xs text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 font-mono"
               autoFocus
             />
             {contacts.length > 0 && (
@@ -186,14 +186,14 @@ export function ChatPage() {
                   <button
                     key={contact.address}
                     onClick={() => handleNewChat(contact.address)}
-                    className="w-full px-2 py-1.5 text-left hover:bg-gray-800 rounded text-xs flex items-center gap-2"
+                    className="w-full px-2 py-1.5 text-left hover:bg-surface-hover rounded text-xs flex items-center gap-2"
                   >
-                    <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] text-gray-300">
+                    <div className="w-5 h-5 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] text-text-secondary">
                         {contact.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <span className="text-gray-300 truncate">{contact.name}</span>
+                    <span className="text-text-secondary truncate">{contact.name}</span>
                   </button>
                 ))}
               </div>

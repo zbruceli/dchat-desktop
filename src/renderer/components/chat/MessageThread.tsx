@@ -65,16 +65,16 @@ function SubscriberPanel({
   }
 
   return (
-    <div className="w-56 border-l border-gray-800 flex flex-col min-h-0 bg-gray-900/50">
-      <div className="px-3 py-2.5 border-b border-gray-800 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-300">
+    <div className="w-56 border-l border-surface-border flex flex-col min-h-0 bg-surface-deep">
+      <div className="px-3 py-2.5 border-b border-surface-border flex items-center justify-between">
+        <span className="text-xs font-semibold text-text-secondary">
           Members ({subscribers.length})
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+            className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors disabled:opacity-40"
             title="Refresh from blockchain"
           >
             <svg
@@ -93,7 +93,7 @@ function SubscriberPanel({
           </button>
           <button
             onClick={onClose}
-            className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors"
+            className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
             title="Close"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,25 +105,25 @@ function SubscriberPanel({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <span className="text-xs text-gray-500">Loading...</span>
+            <span className="text-xs text-text-muted">Loading...</span>
           </div>
         ) : subscribers.length === 0 ? (
           <div className="flex items-center justify-center py-8">
-            <span className="text-xs text-gray-500">No subscribers yet</span>
+            <span className="text-xs text-text-muted">No subscribers yet</span>
           </div>
         ) : (
           <div className="py-1">
             {subscribers.map((sub) => (
               <div
                 key={sub.contactAddress}
-                className="px-3 py-1.5 flex items-center gap-2 hover:bg-gray-800/50"
+                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50"
               >
-                <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[9px] text-gray-300">
+                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
+                  <span className="text-[9px] text-text-secondary">
                     {sub.contactAddress.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <span className="text-xs text-gray-300 truncate" title={sub.contactAddress}>
+                <span className="text-xs text-text-secondary truncate" title={sub.contactAddress}>
                   {getDisplayName(sub.contactAddress)}
                 </span>
               </div>
@@ -200,8 +200,8 @@ export function MessageThread() {
 
   if (!activeSessionId || !session) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-gray-500">Select a conversation to start messaging</p>
+      <div className="flex-1 flex items-center justify-center bg-surface-base">
+        <p className="text-sm text-text-muted">Select a conversation to start messaging</p>
       </div>
     );
   }
@@ -277,13 +277,13 @@ export function MessageThread() {
 
   return (
     <div className="flex-1 flex min-h-0">
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-surface-base">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            isTopic ? "bg-primary-900" : isPrivateGroup ? "bg-emerald-900" : "bg-gray-700"
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-border">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            isTopic ? "bg-accent-700/30" : isPrivateGroup ? "bg-emerald-700/30" : "bg-surface-hover"
           }`}>
-            <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : isPrivateGroup ? "text-emerald-300" : "text-gray-300"}`}>
+            <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
               {isTopic ? "#" : isPrivateGroup ? (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -292,23 +292,23 @@ export function MessageThread() {
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-200">{displayName}</div>
+            <div className="text-[15px] font-bold text-text-primary">{displayName}</div>
             {isTopic ? (
               <button
                 onClick={() => setShowMembers(!showMembers)}
-                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                className="text-[11px] text-text-muted hover:text-text-secondary transition-colors"
               >
                 {topic?.memberCount ?? 0} members {showMembers ? "\u25B4" : "\u25BE"}
               </button>
             ) : isPrivateGroup ? (
               <button
                 onClick={() => setShowMembers(!showMembers)}
-                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                className="text-[11px] text-text-muted hover:text-text-secondary transition-colors"
               >
                 {group?.count ?? 0} members {showMembers ? "\u25B4" : "\u25BE"}
               </button>
             ) : (
-              <div className="text-[10px] text-gray-500 truncate max-w-[300px]">
+              <div className="text-[11px] text-text-muted truncate max-w-[300px]">
                 {session.targetAddress}
               </div>
             )}
@@ -319,8 +319,8 @@ export function MessageThread() {
                 onClick={() => setShowMembers(!showMembers)}
                 className={`p-1.5 rounded transition-colors ${
                   showMembers
-                    ? "bg-gray-700 text-gray-200"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+                    ? "bg-surface-hover text-text-primary"
+                    : "text-text-muted hover:text-text-primary hover:bg-surface-hover"
                 }`}
                 title="Show members"
               >
@@ -331,7 +331,7 @@ export function MessageThread() {
               <button
                 onClick={() => setShowLeaveConfirm(true)}
                 disabled={leaving}
-                className="px-3 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+                className="px-3 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-surface-hover rounded transition-colors disabled:opacity-50"
               >
                 {leaving ? "Leaving..." : "Leave"}
               </button>
@@ -340,10 +340,10 @@ export function MessageThread() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        <div className="flex-1 overflow-y-auto py-2">
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-text-muted">
                 {isTopic ? "No messages yet in this topic." : "No messages yet. Say hello!"}
               </p>
             </div>
@@ -373,19 +373,19 @@ export function MessageThread() {
 
       {/* Leave confirmation dialog */}
       {showLeaveConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="text-white text-base font-semibold mb-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface-base border border-surface-border rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-text-primary text-base font-semibold mb-2">
               Leave {isPrivateGroup ? "Group" : "Topic"}
             </h3>
-            <p className="text-gray-400 text-sm mb-5">
-              Are you sure you want to leave <span className="text-white font-medium">{displayName}</span>?
+            <p className="text-text-secondary text-sm mb-5">
+              Are you sure you want to leave <span className="text-text-primary font-medium">{displayName}</span>?
               {isPrivateGroup && " This action cannot be undone and the conversation will be removed."}
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowLeaveConfirm(false)}
-                className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary bg-surface-raised hover:bg-surface-hover rounded-lg transition-colors"
               >
                 Cancel
               </button>

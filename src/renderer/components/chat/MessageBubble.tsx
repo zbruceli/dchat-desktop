@@ -62,7 +62,7 @@ function ImageContent({ message }: { message: Message }) {
         <img
           src={src}
           alt="Image"
-          className="max-w-[280px] max-h-[280px] rounded-lg cursor-pointer object-cover"
+          className="max-w-[400px] max-h-[300px] rounded-lg cursor-pointer object-cover"
           onClick={() => setShowModal(true)}
           onError={() => setLoadError(true)}
         />
@@ -74,7 +74,7 @@ function ImageContent({ message }: { message: Message }) {
   // Outbound message that failed to send
   if (message.isOutbound && message.status === "failed") {
     return (
-      <div className="w-[120px] h-[120px] bg-gray-700 rounded-lg flex items-center justify-center">
+      <div className="w-[120px] h-[120px] bg-surface-raised rounded-lg flex items-center justify-center">
         <span className="text-xs text-red-400">Send failed</span>
       </div>
     );
@@ -83,8 +83,8 @@ function ImageContent({ message }: { message: Message }) {
   // Outbound message still uploading
   if (message.isOutbound && message.status === "sending") {
     return (
-      <div className="w-[120px] h-[120px] bg-gray-700 rounded-lg flex items-center justify-center">
-        <span className="text-xs text-white bg-black/50 px-2 py-1 rounded">Uploading...</span>
+      <div className="w-[120px] h-[120px] bg-surface-raised rounded-lg flex items-center justify-center">
+        <span className="text-xs text-text-muted bg-black/50 px-2 py-1 rounded">Uploading...</span>
       </div>
     );
   }
@@ -97,10 +97,10 @@ function ImageContent({ message }: { message: Message }) {
           <img
             src={cacheUrl(message.thumbnailLocalFilePath!)}
             alt="Image thumbnail"
-            className="max-w-[280px] max-h-[280px] rounded-lg blur-sm object-cover"
+            className="max-w-[400px] max-h-[300px] rounded-lg blur-sm object-cover"
           />
         ) : (
-          <div className="w-[120px] h-[120px] bg-gray-700 rounded-lg" />
+          <div className="w-[120px] h-[120px] bg-surface-raised rounded-lg" />
         )}
         <div className="absolute inset-0 flex items-center justify-center">
           <button
@@ -120,8 +120,8 @@ function ImageContent({ message }: { message: Message }) {
   // Inbound message without encryption keys — image cannot be decrypted
   if (!message.isOutbound && !hasEncryptionKeys(message)) {
     return (
-      <div className="w-[120px] h-[120px] bg-gray-700 rounded-lg flex items-center justify-center">
-        <span className="text-xs text-gray-400">Image unavailable</span>
+      <div className="w-[120px] h-[120px] bg-surface-raised rounded-lg flex items-center justify-center">
+        <span className="text-xs text-text-muted">Image unavailable</span>
       </div>
     );
   }
@@ -133,7 +133,7 @@ function ImageContent({ message }: { message: Message }) {
         <img
           src={cacheUrl(message.thumbnailLocalFilePath!)}
           alt="Image preview"
-          className="max-w-[280px] max-h-[280px] rounded-lg object-cover"
+          className="max-w-[400px] max-h-[300px] rounded-lg object-cover"
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-xs text-white bg-black/50 px-2 py-1 rounded">
@@ -146,8 +146,8 @@ function ImageContent({ message }: { message: Message }) {
 
   // No thumbnail, no full image — show placeholder
   return (
-    <div className="w-[120px] h-[120px] bg-gray-700 rounded-lg flex items-center justify-center">
-      <span className="text-xs text-white bg-black/50 px-2 py-1 rounded">
+    <div className="w-[120px] h-[120px] bg-surface-raised rounded-lg flex items-center justify-center">
+      <span className="text-xs text-text-muted bg-black/50 px-2 py-1 rounded">
         Downloading...
       </span>
     </div>
@@ -194,7 +194,7 @@ function InvitationContent({ message }: { message: Message }) {
     } catch { /* ignore */ }
     return (
       <div className="space-y-1">
-        <p className="text-sm">
+        <p className="text-sm text-text-primary">
           Invited {inviteeName ? <span className="font-medium">{inviteeName}</span> : "someone"} to join{" "}
           <span className="font-semibold">{groupName}</span>
         </p>
@@ -204,7 +204,7 @@ function InvitationContent({ message }: { message: Message }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm">
+      <p className="text-sm text-text-primary">
         Invited you to join <span className="font-semibold">{groupName}</span>
       </p>
       {!alreadyJoined && (
@@ -226,7 +226,7 @@ function InvitationContent({ message }: { message: Message }) {
 function ControlMessageContent({ message }: { message: Message }) {
   return (
     <div className="text-center py-1">
-      <span className="text-[10px] text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded">
+      <span className="text-[10px] text-text-muted bg-surface-raised/50 px-2 py-0.5 rounded">
         {message.content}
       </span>
     </div>
@@ -237,6 +237,19 @@ function ControlMessageContent({ message }: { message: Message }) {
 function truncateAddress(addr: string): string {
   if (addr.length <= 16) return addr;
   return addr.substring(0, 8) + "..." + addr.substring(addr.length - 6);
+}
+
+/** Generate a consistent color from a string (for avatar backgrounds) */
+function stringToColor(str: string): string {
+  const colors = [
+    "bg-blue-700", "bg-emerald-700", "bg-purple-700", "bg-amber-700",
+    "bg-rose-700", "bg-cyan-700", "bg-indigo-700", "bg-teal-700",
+  ];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 }
 
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
@@ -251,28 +264,6 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
 
   if (isControlMessage) {
     return <ControlMessageContent message={message} />;
-  }
-
-  // Private group invitation renders with Accept button
-  if (message.contentType === "privateGroup:invitation") {
-    return (
-      <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} mb-1`}>
-        <div className={`max-w-[70%] px-3 py-2 rounded-2xl ${
-          isOutbound
-            ? "bg-primary-600 text-white rounded-br-md"
-            : "bg-gray-800 text-gray-200 rounded-bl-md"
-        }`}>
-          <InvitationContent message={message} />
-          <div className={`flex items-center justify-end gap-1 mt-0.5 ${
-            isOutbound ? "text-primary-200" : "text-gray-500"
-          }`}>
-            <span className="text-[10px]">
-              {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   const isAudio = message.contentType === "audio";
@@ -301,41 +292,70 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             ? "\u2717" // x
             : "";
 
-  return (
-    <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} mb-1`}>
-      <div
-        className={`max-w-[70%] px-3 py-2 rounded-2xl ${
-          isOutbound
-            ? "bg-primary-600 text-white rounded-br-md"
-            : "bg-gray-800 text-gray-200 rounded-bl-md"
-        }`}
-      >
-        {showSender && !isOutbound && (
-          <div className="text-[10px] text-primary-400 font-medium mb-0.5 truncate">
-            {(() => {
-              const contact = contacts.find((c) => c.address === message.sender);
-              return contact?.name && !contact.name.endsWith("...")
-                ? contact.name
-                : truncateAddress(message.sender);
-            })()}
+  const senderName = (() => {
+    if (isOutbound) return "You";
+    const contact = contacts.find((c) => c.address === message.sender);
+    return contact?.name && !contact.name.endsWith("...")
+      ? contact.name
+      : truncateAddress(message.sender);
+  })();
+
+  const senderKey = isOutbound ? "you" : message.sender;
+  const avatarColor = stringToColor(senderKey);
+  const avatarInitial = senderName.charAt(0).toUpperCase();
+
+  // Private group invitation renders specially
+  if (message.contentType === "privateGroup:invitation") {
+    return (
+      <div className="group flex items-start gap-3 px-5 py-1 hover:bg-surface-hover/50 transition-colors">
+        <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
+          <span className="text-sm text-white font-medium">{avatarInitial}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
+            <span className="text-[11px] text-text-muted">{time}</span>
+            {isOutbound && (
+              <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
+                {statusIcon}
+              </span>
+            )}
           </div>
-        )}
-        {isAudio || isIpfsAudio ? (
-          <AudioContent message={message} />
-        ) : isIpfsFile ? (
-          <FileContent message={message} />
-        ) : isIpfsImage ? (
-          <ImageContent message={message} />
-        ) : (
-          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-        )}
-        <div
-          className={`flex items-center justify-end gap-1 mt-0.5 ${
-            isOutbound ? "text-primary-200" : "text-gray-500"
-          }`}
-        >
-          <span className="text-[10px]">{time}</span>
-          {isOutbound && <span className="text-[10px]">{statusIcon}</span>}
+          <div className="mt-0.5">
+            <InvitationContent message={message} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex items-start gap-3 px-5 py-1 hover:bg-surface-hover/50 transition-colors">
+      {/* Avatar */}
+      <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
+        <span className="text-sm text-white font-medium">{avatarInitial}</span>
+      </div>
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
+          <span className="text-[11px] text-text-muted">{time}</span>
+          {isOutbound && (
+            <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
+              {statusIcon}
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5">
+          {isAudio || isIpfsAudio ? (
+            <AudioContent message={message} />
+          ) : isIpfsFile ? (
+            <FileContent message={message} />
+          ) : isIpfsImage ? (
+            <ImageContent message={message} />
+          ) : (
+            <p className="text-[15px] text-text-primary whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+          )}
         </div>
       </div>
     </div>

@@ -42,13 +42,13 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
     : null;
 
   return (
-    <div className="w-80 border-l border-gray-800 flex flex-col bg-gray-900">
+    <div className="w-80 border-l border-surface-border flex flex-col bg-surface-deep">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <h3 className="text-sm font-semibold text-gray-300">Contact Details</h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
+        <h3 className="text-sm font-semibold text-text-secondary">Contact Details</h3>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-300 transition-colors text-lg leading-none"
+          className="text-text-faint hover:text-text-secondary transition-colors text-lg leading-none"
         >
           &times;
         </button>
@@ -60,7 +60,7 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
         <div className="flex justify-center">
           <button
             onClick={() => pickAndSetContactAvatar(contact.address)}
-            className="group relative w-20 h-20 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center hover:ring-2 hover:ring-primary-500 transition-all"
+            className="group relative w-20 h-20 rounded-lg overflow-hidden bg-surface-hover flex items-center justify-center hover:ring-2 hover:ring-accent-500 transition-all"
             title="Click to change avatar"
           >
             {avatarUrl ? (
@@ -70,7 +70,7 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span className="text-2xl text-gray-400">
+              <span className="text-2xl text-text-secondary">
                 {contact.name.charAt(0).toUpperCase()}
               </span>
             )}
@@ -85,7 +85,7 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
 
         {/* Name */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Name</label>
+          <label className="block text-xs text-text-muted mb-1">Name</label>
           <input
             ref={inputRef}
             type="text"
@@ -93,14 +93,14 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
             onChange={(e) => setName(e.target.value)}
             onBlur={handleNameSave}
             onKeyDown={handleKeyDown}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-500/50"
           />
         </div>
 
         {/* NKN Address */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">NKN Address</label>
-          <div className="px-3 py-2 bg-gray-800/50 border border-gray-700/50 rounded-lg text-gray-400 text-xs font-mono break-all select-all">
+          <label className="block text-xs text-text-muted mb-1">NKN Address</label>
+          <div className="px-3 py-2 bg-surface-raised/50 border border-surface-border/50 rounded-lg text-text-secondary text-xs font-mono break-all select-all">
             {contact.address}
           </div>
         </div>
@@ -109,7 +109,7 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
         <div className="space-y-2 pt-2">
           <button
             onClick={() => onStartChat(contact.address)}
-            className="w-full px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Start Chat
           </button>

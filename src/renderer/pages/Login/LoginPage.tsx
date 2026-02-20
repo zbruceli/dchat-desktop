@@ -77,10 +77,10 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="w-full max-w-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-100 mb-1 text-center">D-Chat Desktop</h1>
-        <p className="text-sm text-gray-500 mb-6 text-center">Decentralized encrypted messaging</p>
+    <div className="flex-1 flex items-center justify-center bg-surface-deepest">
+      <div className="w-full max-w-sm p-6 bg-surface-base rounded-xl border border-surface-border">
+        <h1 className="text-2xl font-bold text-text-primary mb-1 text-center">D-Chat Desktop</h1>
+        <p className="text-sm text-text-muted mb-6 text-center">Decentralized encrypted messaging</p>
 
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-sm">
@@ -88,11 +88,11 @@ export function LoginPage() {
           </div>
         )}
 
-        <div className="flex gap-1 mb-4 p-1 bg-gray-800 rounded-lg">
+        <div className="flex gap-1 mb-4 p-1 bg-surface-raised rounded-lg">
           <button
             onClick={() => setMode("create")}
             className={`flex-1 py-1.5 text-sm rounded-md transition-colors ${
-              mode === "create" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-gray-300"
+              mode === "create" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:text-text-secondary"
             }`}
           >
             New Wallet
@@ -100,7 +100,7 @@ export function LoginPage() {
           <button
             onClick={() => setMode("import")}
             className={`flex-1 py-1.5 text-sm rounded-md transition-colors ${
-              mode === "import" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-gray-300"
+              mode === "import" ? "bg-surface-hover text-text-primary" : "text-text-muted hover:text-text-secondary"
             }`}
           >
             Import
@@ -113,7 +113,7 @@ export function LoginPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 text-sm"
+            className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm"
             disabled={loading}
           />
 
@@ -123,7 +123,7 @@ export function LoginPage() {
               value={keystore}
               onChange={(e) => setKeystore(e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-primary-500 text-sm resize-none font-mono"
+              className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm resize-none font-mono"
               disabled={loading}
             />
           )}
@@ -134,14 +134,14 @@ export function LoginPage() {
                 <button
                   onClick={handleCreate}
                   disabled={loading}
-                  className="w-full py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="w-full py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   {loading ? "Creating..." : "Create New Wallet"}
                 </button>
                 <button
                   onClick={handleRestore}
                   disabled={loading}
-                  className="w-full py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 rounded-lg text-sm transition-colors"
+                  className="w-full py-2 bg-surface-hover hover:bg-surface-border disabled:opacity-50 text-text-secondary rounded-lg text-sm transition-colors"
                 >
                   {loading ? "Restoring..." : "Restore Saved Wallet"}
                 </button>
@@ -150,7 +150,7 @@ export function LoginPage() {
               <button
                 onClick={handleImport}
                 disabled={loading}
-                className="w-full py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                className="w-full py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 {loading ? "Importing..." : "Import Wallet"}
               </button>

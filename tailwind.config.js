@@ -4,23 +4,27 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+        surface: {
+          deepest: "#1a1d21",
+          deep: "#1e2126",
+          base: "#222529",
+          raised: "#2c2d31",
+          hover: "#35373b",
+          border: "#393b40",
         },
-        sidebar: {
-          bg: "#1e1e2e",
-          hover: "#2a2a3e",
-          active: "#363650",
+        accent: {
+          400: "#6b9bff",
+          500: "#4a7cf7",
+          600: "#3b6be0",
+          700: "#2d5acc",
         },
+        text: {
+          primary: "#e8e8ed",
+          secondary: "#b5b5bd",
+          muted: "#8b8b96",
+          faint: "#636369",
+        },
+        badge: "#e01e5a",
       },
     },
   },

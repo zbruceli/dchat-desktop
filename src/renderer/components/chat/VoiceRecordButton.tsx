@@ -124,7 +124,7 @@ export function VoiceRecordButton({ onRecordComplete, disabled }: VoiceRecordBut
     return (
       <button
         onClick={() => setMicError(false)}
-        className="p-2 text-red-400 hover:text-red-300 transition-colors flex-shrink-0"
+        className="p-1.5 text-red-400 hover:text-red-300 transition-colors flex-shrink-0 rounded"
         title="Microphone access denied. Click to retry."
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +146,7 @@ export function VoiceRecordButton({ onRecordComplete, disabled }: VoiceRecordBut
         {/* Cancel button */}
         <button
           onClick={() => stopRecording(false)}
-          className="p-1.5 text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
+          className="p-1.5 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
           title="Cancel recording (ESC)"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,7 +180,7 @@ export function VoiceRecordButton({ onRecordComplete, disabled }: VoiceRecordBut
     <button
       onClick={startRecording}
       disabled={disabled}
-      className="p-2 text-gray-400 hover:text-gray-200 disabled:opacity-40 transition-colors flex-shrink-0 cursor-pointer"
+      className="p-1.5 text-text-muted hover:text-text-primary disabled:opacity-40 transition-colors flex-shrink-0 cursor-pointer rounded"
       title="Record voice message"
     >
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

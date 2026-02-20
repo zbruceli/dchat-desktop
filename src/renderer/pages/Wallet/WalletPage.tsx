@@ -13,14 +13,14 @@ function CopyableField({ label, value }: { label: string; value: string }) {
 
   return (
     <div className="space-y-1.5">
-      <label className="text-xs text-gray-500 uppercase tracking-wide">{label}</label>
+      <label className="text-xs text-text-muted uppercase tracking-wide">{label}</label>
       <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 font-mono break-all select-all">
+        <div className="flex-1 min-w-0 px-3 py-2.5 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary font-mono break-all select-all">
           {value}
         </div>
         <button
           onClick={handleCopy}
-          className="flex-shrink-0 px-3 py-2.5 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          className="flex-shrink-0 px-3 py-2.5 rounded-lg bg-surface-raised border border-surface-border hover:bg-surface-hover text-xs text-text-muted hover:text-text-primary transition-colors"
           title="Copy to clipboard"
         >
           {copied ? "Copied!" : "Copy"}
@@ -182,35 +182,35 @@ export function WalletPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-6 py-4 border-b border-gray-800">
-        <h2 className="text-lg font-semibold text-gray-200">Wallet</h2>
-        <p className="text-xs text-gray-500 mt-0.5">Send, receive, and manage NKN tokens</p>
+      <div className="px-6 py-4 border-b border-surface-border">
+        <h2 className="text-lg font-semibold text-text-primary">Wallet</h2>
+        <p className="text-xs text-text-muted mt-0.5">Send, receive, and manage NKN tokens</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
         {/* Balance Section */}
         {walletAddress && (
           <section className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-300">Balance</h3>
+            <h3 className="text-sm font-medium text-text-secondary">Balance</h3>
             <div className="flex items-center gap-3">
-              <div className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg">
-                <div className="text-xs text-gray-500 mb-1">NKN Balance</div>
-                <div className="text-lg font-semibold text-gray-200">
+              <div className="px-4 py-3 bg-surface-raised border border-surface-border rounded-lg">
+                <div className="text-xs text-text-muted mb-1">NKN Balance</div>
+                <div className="text-lg font-semibold text-text-primary">
                   {balanceLoading ? (
-                    <span className="text-gray-500 text-sm">Loading...</span>
+                    <span className="text-text-muted text-sm">Loading...</span>
                   ) : balance !== null ? (
                     <>
-                      {balance} <span className="text-xs text-gray-500">NKN</span>
+                      {balance} <span className="text-xs text-text-muted">NKN</span>
                     </>
                   ) : (
-                    <span className="text-gray-500 text-sm">Unavailable</span>
+                    <span className="text-text-muted text-sm">Unavailable</span>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => walletAddress && loadBalance(walletAddress)}
                 disabled={balanceLoading}
-                className="px-3 py-2 text-xs rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 text-gray-400 hover:text-gray-200 transition-colors"
+                className="px-3 py-2 text-xs rounded-lg bg-surface-raised border border-surface-border hover:bg-surface-hover disabled:opacity-50 text-text-muted hover:text-text-primary transition-colors"
               >
                 Refresh
               </button>
@@ -221,10 +221,10 @@ export function WalletPage() {
         {/* Send Section */}
         {walletAddress && (
           <section className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-300">Send NKN</h3>
+            <h3 className="text-sm font-medium text-text-secondary">Send NKN</h3>
             <form onSubmit={handleSend} className="space-y-3">
               <div className="space-y-1.5">
-                <label className="text-xs text-gray-500">To Address</label>
+                <label className="text-xs text-text-muted">To Address</label>
                 <div className="relative" ref={contactPickerRef}>
                   <div className="flex gap-2">
                     <input
@@ -232,7 +232,7 @@ export function WalletPage() {
                       value={toAddress}
                       onChange={(e) => setToAddress(e.target.value)}
                       placeholder="NKN wallet address"
-                      className="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500 font-mono"
+                      className="flex-1 px-3 py-2.5 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 font-mono"
                       disabled={sending}
                     />
                     {contacts.length > 0 && (
@@ -240,7 +240,7 @@ export function WalletPage() {
                         type="button"
                         onClick={() => setShowContacts(!showContacts)}
                         disabled={sending}
-                        className="flex-shrink-0 px-3 py-2.5 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                        className="flex-shrink-0 px-3 py-2.5 rounded-lg bg-surface-raised border border-surface-border hover:bg-surface-hover disabled:opacity-50 text-xs text-text-muted hover:text-text-primary transition-colors"
                         title="Pick from contacts"
                       >
                         Contacts
@@ -248,7 +248,7 @@ export function WalletPage() {
                     )}
                   </div>
                   {showContacts && (
-                    <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-gray-800 border border-gray-700 rounded-lg shadow-lg">
+                    <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-surface-raised border border-surface-border rounded-lg shadow-lg">
                       {contacts.map((c) => (
                         <button
                           key={c.address}
@@ -262,11 +262,11 @@ export function WalletPage() {
                               setToAddress(c.address);
                             }
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-700 transition-colors"
+                          className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors"
                         >
-                          <div className="text-sm text-gray-200 truncate">{c.name || c.address}</div>
+                          <div className="text-sm text-text-primary truncate">{c.name || c.address}</div>
                           {c.name && (
-                            <div className="text-xs text-gray-500 font-mono truncate">{c.address}</div>
+                            <div className="text-xs text-text-faint font-mono truncate">{c.address}</div>
                           )}
                         </button>
                       ))}
@@ -277,7 +277,7 @@ export function WalletPage() {
 
               <div className="flex gap-3">
                 <div className="flex-1 space-y-1.5">
-                  <label className="text-xs text-gray-500">Amount</label>
+                  <label className="text-xs text-text-muted">Amount</label>
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -286,14 +286,14 @@ export function WalletPage() {
                       placeholder="0"
                       min="0"
                       step="any"
-                      className="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+                      className="flex-1 px-3 py-2.5 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
                       disabled={sending}
                     />
                     <button
                       type="button"
                       onClick={handleMaxAmount}
                       disabled={balance === null || sending}
-                      className="px-3 py-2.5 text-xs rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 text-gray-400 hover:text-gray-200 transition-colors"
+                      className="px-3 py-2.5 text-xs rounded-lg bg-surface-raised border border-surface-border hover:bg-surface-hover disabled:opacity-50 text-text-muted hover:text-text-primary transition-colors"
                     >
                       MAX
                     </button>
@@ -301,7 +301,7 @@ export function WalletPage() {
                 </div>
 
                 <div className="w-28 space-y-1.5">
-                  <label className="text-xs text-gray-500">Fee</label>
+                  <label className="text-xs text-text-muted">Fee</label>
                   <input
                     type="number"
                     value={fee}
@@ -309,7 +309,7 @@ export function WalletPage() {
                     min="0"
                     max="10"
                     step="any"
-                    className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+                    className="w-full px-3 py-2.5 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
                     disabled={sending}
                   />
                 </div>
@@ -318,7 +318,7 @@ export function WalletPage() {
               <button
                 type="submit"
                 disabled={sending || !toAddress.trim() || !amount}
-                className="px-5 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                className="px-5 py-2.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
               >
                 {sending ? "Sending..." : "Send"}
               </button>
@@ -354,7 +354,7 @@ export function WalletPage() {
 
         {/* Receive Section */}
         <section className="space-y-4">
-          <h3 className="text-sm font-medium text-gray-300">Receive</h3>
+          <h3 className="text-sm font-medium text-text-secondary">Receive</h3>
 
           {walletAddress && (
             <CopyableField label="NKN Wallet Address" value={walletAddress} />
@@ -365,19 +365,19 @@ export function WalletPage() {
           )}
 
           {!nknAddress && !walletAddress && (
-            <p className="text-sm text-gray-500">Not connected</p>
+            <p className="text-sm text-text-muted">Not connected</p>
           )}
         </section>
 
         {/* Network Test Section */}
         {nknAddress && (
           <section className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-300">Network</h3>
+            <h3 className="text-sm font-medium text-text-secondary">Network</h3>
             <div className="flex items-center gap-3">
               <button
                 onClick={handleEchoTest}
                 disabled={echoTesting}
-                className="px-4 py-2.5 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium transition-colors"
+                className="px-4 py-2.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white font-medium transition-colors"
               >
                 {echoTesting ? "Testing..." : "Run Echo Test"}
               </button>
@@ -395,7 +395,7 @@ export function WalletPage() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-gray-600">
+            <p className="text-[11px] text-text-faint">
               Sends a message to your own NKN address to verify P2P connectivity.
             </p>
           </section>

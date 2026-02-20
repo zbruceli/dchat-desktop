@@ -42,12 +42,12 @@ function ProfileSection() {
 
   return (
     <section className="max-w-lg mb-8">
-      <h2 className="text-sm font-medium text-gray-300 mb-4">Profile</h2>
+      <h2 className="text-sm font-medium text-text-secondary mb-4">Profile</h2>
 
       <div className="flex items-start gap-4 mb-4">
         <div className="flex flex-col items-center gap-2">
           <div
-            className="w-20 h-20 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden bg-primary-700 text-white text-2xl font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+            className="w-20 h-20 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden bg-accent-700 text-white text-2xl font-semibold cursor-pointer hover:opacity-80 transition-opacity"
             onClick={pickAndSetAvatar}
             title="Click to change avatar"
           >
@@ -63,7 +63,7 @@ function ProfileSection() {
           </div>
           <button
             onClick={pickAndSetAvatar}
-            className="text-[11px] text-primary-400 hover:text-primary-300 transition-colors"
+            className="text-[11px] text-accent-400 hover:text-accent-500 transition-colors"
           >
             Change
           </button>
@@ -71,7 +71,7 @@ function ProfileSection() {
 
         <div className="flex-1">
           <label className="block mb-4">
-            <span className="text-xs text-gray-400 mb-1 block">Nickname</span>
+            <span className="text-xs text-text-muted mb-1 block">Nickname</span>
             <input
               type="text"
               value={nicknameValue}
@@ -80,14 +80,14 @@ function ProfileSection() {
               onKeyDown={(e) => e.key === "Enter" && handleSaveNickname()}
               placeholder="Set your display name"
               maxLength={64}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+              className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
             />
           </label>
           {nicknameSaved && (
             <span className="text-[11px] text-green-400">Saved!</span>
           )}
           {profile?.profileVersion && (
-            <div className="text-[10px] text-gray-600 mt-2">
+            <div className="text-[10px] text-text-faint mt-2">
               Profile version: {profile.profileVersion.substring(0, 8)}
             </div>
           )}
@@ -137,49 +137,49 @@ export function SettingsPage() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-gray-500">Loading settings...</p>
+        <p className="text-sm text-text-muted">Loading settings...</p>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <h1 className="text-xl font-semibold text-gray-200 mb-6">Settings</h1>
+      <h1 className="text-xl font-semibold text-text-primary mb-6">Settings</h1>
 
       <ProfileSection />
 
       <section className="max-w-lg">
-        <h2 className="text-sm font-medium text-gray-300 mb-4">IPFS Configuration</h2>
-        <p className="text-xs text-gray-500 mb-4">
+        <h2 className="text-sm font-medium text-text-secondary mb-4">IPFS Configuration</h2>
+        <p className="text-xs text-text-muted mb-4">
           Configure the IPFS gateway for image storage. By default, D-Chat uses the same
           IPFS node as nMobile (no authentication required).
         </p>
 
         <label className="block mb-4">
-          <span className="text-xs text-gray-400 mb-1 block">IPFS Gateway Host</span>
+          <span className="text-xs text-text-muted mb-1 block">IPFS Gateway Host</span>
           <input
             type="text"
             value={gatewayHost}
             onChange={(e) => setGatewayHost(e.target.value)}
             placeholder="64.225.88.71"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
           />
         </label>
 
         <label className="block mb-6">
-          <span className="text-xs text-gray-400 mb-1 block">Port</span>
+          <span className="text-xs text-text-muted mb-1 block">Port</span>
           <input
             type="text"
             value={gatewayPort}
             onChange={(e) => setGatewayPort(e.target.value)}
             placeholder="80"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-primary-500"
+            className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
           />
         </label>
 
         <button
           onClick={handleSave}
-          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
         >
           {saved ? "Saved!" : "Save"}
         </button>

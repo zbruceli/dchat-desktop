@@ -97,13 +97,13 @@ export function AudioContent({ message }: AudioContentProps) {
   if (message.isOutbound && message.status === "sending") {
     return (
       <div className="flex items-center gap-2 min-w-[180px]">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-white/60" viewBox="0 0 24 24" fill="currentColor">
+        <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
         </div>
-        <span className="text-xs text-white/60">Uploading...</span>
+        <span className="text-xs text-text-muted">Uploading...</span>
       </div>
     );
   }
@@ -112,7 +112,7 @@ export function AudioContent({ message }: AudioContentProps) {
   if (message.isOutbound && message.status === "failed") {
     return (
       <div className="flex items-center gap-2 min-w-[180px]">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center flex-shrink-0">
           <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
@@ -127,8 +127,8 @@ export function AudioContent({ message }: AudioContentProps) {
   if (downloadFailed) {
     return (
       <div className="flex items-center gap-2 min-w-[180px]">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-white/60" viewBox="0 0 24 24" fill="currentColor">
+        <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
@@ -153,13 +153,13 @@ export function AudioContent({ message }: AudioContentProps) {
   ) {
     return (
       <div className="flex items-center gap-2 min-w-[180px]">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-white/60" viewBox="0 0 24 24" fill="currentColor">
+        <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
         </div>
-        <span className="text-xs text-gray-400">Audio unavailable</span>
+        <span className="text-xs text-text-muted">Audio unavailable</span>
       </div>
     );
   }
@@ -170,8 +170,8 @@ export function AudioContent({ message }: AudioContentProps) {
     const isInlineAudio = message.contentType === "audio" && !!message.content;
     return (
       <div className="flex items-center gap-2 min-w-[180px]">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-white/60" viewBox="0 0 24 24" fill="currentColor">
+        <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
@@ -179,12 +179,12 @@ export function AudioContent({ message }: AudioContentProps) {
         {isInlineAudio ? (
           <button
             onClick={() => downloadAudio(message.id)}
-            className="text-xs text-white/60 hover:text-white/80 cursor-pointer transition-colors"
+            className="text-xs text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
           >
             Tap to load
           </button>
         ) : (
-          <span className="text-xs text-white/60">Downloading...</span>
+          <span className="text-xs text-text-muted">Downloading...</span>
         )}
       </div>
     );
@@ -199,29 +199,29 @@ export function AudioContent({ message }: AudioContentProps) {
       <audio ref={audioRef} src={src} preload="metadata" />
       <button
         onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer"
+        className="w-8 h-8 rounded-full bg-surface-hover hover:bg-surface-border flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer"
       >
         {isPlaying ? (
-          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-4 h-4 text-text-primary" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
         ) : (
-          <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-4 h-4 text-text-primary ml-0.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5v14l11-7z" />
           </svg>
         )}
       </button>
       <div className="flex-1 flex flex-col gap-1">
         <div
-          className="h-1 bg-white/20 rounded-full cursor-pointer"
+          className="h-1 bg-surface-border rounded-full cursor-pointer"
           onClick={handleProgressClick}
         >
           <div
-            className="h-full bg-white/70 rounded-full transition-all"
+            className="h-full bg-accent-500 rounded-full transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <span className="text-[10px] text-white/60">
+        <span className="text-[10px] text-text-muted">
           {formatDuration(displayTime)}
         </span>
       </div>

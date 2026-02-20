@@ -41,7 +41,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
 - **Contact name resolution** — Contact names displayed throughout session list and message thread headers
 - **Error boundary** — React error boundary catches rendering crashes and displays error details with retry
-- **Dark theme UI** — Tailwind CSS dark theme with chat bubbles, session list, and contact management
+- **Slack-style dark UI** — Flat message rows with avatars (no chat bubbles), three-tone surface hierarchy, custom color tokens, thin scrollbars, Tailwind CSS
 - Hot-reload development environment
 
 ### Coming Soon
@@ -132,7 +132,7 @@ src/
 ├── renderer/          React UI (runs in browser context)
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
 │   ├── pages/           Login, Chat (two-panel), Contacts, Wallet, Settings
-│   ├── components/      Chat bubbles, image display, lightbox, file display, session list, member panels
+│   ├── components/      Flat message rows, image display, lightbox, file display, session list, member panels
 │   ├── stores/          Zustand stores (client, chat, contact, session, topic, private-group, profile)
 │   └── hooks/           IPC push-event subscriptions
 ├── shared/            Code shared between main and renderer
@@ -204,7 +204,6 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 
 - [nMobile](https://github.com/nknorg/nMobile) — The original mobile messenger this project is ported from
 - [NKN](https://nkn.org/) — The decentralized relay network powering all messaging
-- Dr. Whitfield Diffie — Co-creator of public key cryptography, who advised the nMobile project
 
 ## License
 
