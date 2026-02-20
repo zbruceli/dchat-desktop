@@ -13,6 +13,9 @@ interface ChatState {
   sendTopicAudio: (topicName: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
   sendFile: (to: string) => Promise<void>;
   sendTopicFile: (topicName: string) => Promise<void>;
+  sendPrivateGroupImage: (groupId: string) => Promise<void>;
+  sendPrivateGroupAudio: (groupId: string, audioBuffer: ArrayBuffer, durationSeconds: number) => Promise<void>;
+  sendPrivateGroupFile: (groupId: string) => Promise<void>;
   downloadImage: (messageId: string) => Promise<void>;
   downloadAudio: (messageId: string) => Promise<void>;
   downloadFile: (messageId: string) => Promise<void>;
@@ -100,6 +103,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await window.dchat.topic.sendFile(topicName, filePath);
     } catch (err) {
       console.error("sendTopicFile failed:", err);
+    }
+  },
+
+  sendPrivateGroupImage: async (groupId: string) => {
+    try {
+      const filePath = await window.dchat.chat.pickImage();
+      if (!filePath) return;
+      await window.dchat.privateGroup.sendImage(groupId, filePath);
+    } catch (err) {
+      console.error("sendPrivateGroupImage failed:", err);
+    }
+  },
+
+  sendPrivateGroupAudio: async (groupId: string, audioBuffer: ArrayBuffer, durationSeconds: number) => {
+    try {
+      await window.dchat.privateGroup.sendAudio(groupId, audioBuffer, durationSeconds);
+    } catch (err) {
+      console.error("sendPrivateGroupAudio failed:", err);
+    }
+  },
+
+  sendPrivateGroupFile: async (groupId: string) => {
+    try {
+      const filePath = await window.dchat.chat.pickFile();
+      if (!filePath) return;
+      await window.dchat.privateGroup.sendFile(groupId, filePath);
+    } catch (err) {
+      console.error("sendPrivateGroupFile failed:", err);
     }
   },
 

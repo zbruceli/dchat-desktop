@@ -37,13 +37,16 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
 - **NKN wallet** — View balance, send NKN tokens to any address (with contact picker and auto client→wallet address conversion), receive section with copyable addresses, transaction links to [nscan.io](https://nscan.io)
 - **Settings page** — Profile editing (nickname + avatar) and IPFS gateway configuration
+- **Public topics (group chat)** — Create/join public topic groups via NKN blockchain subscriptions, subscriber management with side panel, leave with confirmation dialog, text/image/voice/file messaging, nMobile-compatible topic name hashing
+- **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
+- **Contact name resolution** — Contact names displayed throughout session list and message thread headers
+- **Error boundary** — React error boundary catches rendering crashes and displays error details with retry
 - **Dark theme UI** — Tailwind CSS dark theme with chat bubbles, session list, and contact management
 - Hot-reload development environment
 
 ### Coming Soon
 - **Encrypted local storage** — SQLCipher database encryption (key derived from wallet seed)
 - **Message receipts** — Delivered and read status tracking
-- **Group chat** — Public topics (on-chain) and private groups (signature-based)
 - **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
 - **Desktop notifications** — Native OS notifications for new messages
@@ -108,7 +111,9 @@ src/
 │   ├── index.ts         App entry — DB init, services, IPC registration
 │   ├── services/        Business logic
 │   │   ├── nkn-client-service.ts   NKN MultiClient wrapper
-│   │   ├── chat-service.ts         Send/receive text + image + audio + file orchestration
+│   │   ├── chat-service.ts         Send/receive orchestration, topic + private group routing
+│   │   ├── topic-service.ts        Topic join/leave, subscriber sync, group messaging
+│   │   ├── private-group-service.ts Private group lifecycle, member sync, Ed25519 signatures
 │   │   ├── image-service.ts        Image resize, thumbnail, encrypt, IPFS upload/download
 │   │   ├── audio-service.ts        WebM→AAC conversion, inline base64 encoding, IPFS audio
 │   │   ├── file-service.ts         Generic file encrypt, IPFS upload/download, cache
@@ -118,19 +123,20 @@ src/
 │   │   └── profile-service.ts      Avatar resize, nickname persistence
 │   ├── db/              SQLite database layer
 │   │   ├── database.ts             Singleton (init/get/close, WAL, FK)
-│   │   ├── migrations/             Version-based schema migrations (001–003)
-│   │   └── repositories/           One repository per entity
+│   │   ├── migrations/             Version-based schema migrations (001–006)
+│   │   └── repositories/           One repository per entity (7 repos)
 │   ├── ipc/             IPC handler registration (one file per domain)
 │   └── crypto/
-│       └── aes-gcm.ts             AES-128-GCM encrypt/decrypt (nMobile-compatible)
+│       ├── aes-gcm.ts             AES-128-GCM encrypt/decrypt (nMobile-compatible)
+│       └── ed25519-signature.ts   Ed25519 sign/verify, group version generation
 ├── renderer/          React UI (runs in browser context)
 │   ├── App.tsx          Auth gate + sidebar nav + page routing
 │   ├── pages/           Login, Chat (two-panel), Contacts, Wallet, Settings
-│   ├── components/      Chat bubbles, image display, lightbox, file display, session list, message input
-│   ├── stores/          Zustand stores (client, chat, contact, session, profile)
+│   ├── components/      Chat bubbles, image display, lightbox, file display, session list, member panels
+│   ├── stores/          Zustand stores (client, chat, contact, session, topic, private-group, profile)
 │   └── hooks/           IPC push-event subscriptions
 ├── shared/            Code shared between main and renderer
-│   ├── types/           TypeScript interfaces (Message, Contact, Session, etc.)
+│   ├── types/           TypeScript interfaces (Message, Contact, Session, Topic, PrivateGroup, etc.)
 │   ├── constants.ts     App constants, NKN seed servers
 │   └── ipc-channels.ts  IPC channel definitions + push channels
 └── preload/           Electron preload (contextBridge)
@@ -191,7 +197,7 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 |---|---|---|
 | 1 | Foundation — NKN client, 1-to-1 messaging, contacts, SQLite DB | Complete |
 | 2 | Rich messaging — Image, voice, and file messaging, IPFS, AES-GCM encryption | Complete |
-| 3 | Group chat — Public topics, private groups | Public topics complete |
+| 3 | Group chat — Public topics, private groups | Complete |
 | 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | NKN wallet complete |
 
 ## Acknowledgments

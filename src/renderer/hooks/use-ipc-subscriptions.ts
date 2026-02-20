@@ -4,6 +4,7 @@ import { useChatStore } from "../stores/chat-store";
 import { useContactStore } from "../stores/contact-store";
 import { useSessionStore } from "../stores/session-store";
 import { useTopicStore } from "../stores/topic-store";
+import { usePrivateGroupStore } from "../stores/private-group-store";
 import { useProfileStore } from "../stores/profile-store";
 
 export function useIpcSubscriptions(): void {
@@ -14,6 +15,8 @@ export function useIpcSubscriptions(): void {
   const handleSessionDelete = useSessionStore((s) => s.handleSessionDelete);
   const handleTopicUpdate = useTopicStore((s) => s.handleTopicUpdate);
   const handleTopicDelete = useTopicStore((s) => s.handleTopicDelete);
+  const handleGroupUpdate = usePrivateGroupStore((s) => s.handleGroupUpdate);
+  const handleGroupDelete = usePrivateGroupStore((s) => s.handleGroupDelete);
   const setProfile = useProfileStore((s) => s.setProfile);
 
   useEffect(() => {
@@ -24,6 +27,8 @@ export function useIpcSubscriptions(): void {
     const unsubSessionDel = window.dchat.session.onDelete(handleSessionDelete);
     const unsubTopic = window.dchat.topic.onUpdate(handleTopicUpdate);
     const unsubTopicDel = window.dchat.topic.onDelete(handleTopicDelete);
+    const unsubGroup = window.dchat.privateGroup.onUpdate(handleGroupUpdate);
+    const unsubGroupDel = window.dchat.privateGroup.onDelete(handleGroupDelete);
     const unsubProfile = window.dchat.profile.onUpdate(setProfile);
 
     return () => {
@@ -34,7 +39,9 @@ export function useIpcSubscriptions(): void {
       unsubSessionDel();
       unsubTopic();
       unsubTopicDel();
+      unsubGroup();
+      unsubGroupDel();
       unsubProfile();
     };
-  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, setProfile]);
+  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile]);
 }

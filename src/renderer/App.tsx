@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Component, type ErrorInfo, type ReactNode } from "react";
 import { useClientStore } from "./stores/client-store";
 import { useNavStore } from "./stores/nav-store";
 import { useIpcSubscriptions } from "./hooks/use-ipc-subscriptions";
@@ -79,7 +79,9 @@ export function App() {
 
       {/* Main content area */}
       <main className="flex-1 flex flex-col min-h-0 min-w-0">
-        <PageContent activeNav={activeNav} />
+        <ErrorBoundary>
+          <PageContent activeNav={activeNav} />
+        </ErrorBoundary>
       </main>
     </div>
   );
@@ -95,6 +97,35 @@ function PageContent({ activeNav }: { activeNav: NavItem }) {
       return <WalletPage />;
     case "settings":
       return <SettingsPage />;
+  }
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[ErrorBoundary]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-lg">
+            <h2 className="text-lg font-semibold text-red-400 mb-2">Something went wrong</h2>
+            <pre className="text-xs text-gray-400 bg-gray-900 p-4 rounded overflow-auto max-h-40 text-left">
+              {this.state.error.message}{"\n"}{this.state.error.stack}
+            </pre>
+            <button
+              onClick={() => this.setState({ error: null })}
+              className="mt-4 px-4 py-2 bg-primary-600 text-white text-sm rounded"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
   }
 }
 

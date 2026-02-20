@@ -14,10 +14,13 @@ import { ImageService } from "./services/image-service";
 import { AudioService } from "./services/audio-service";
 import { FileService } from "./services/file-service";
 import { TopicService } from "./services/topic-service";
+import { PrivateGroupService } from "./services/private-group-service";
 import { ProfileService } from "./services/profile-service";
 import { ContactProfileService } from "./services/contact-profile-service";
 import { TopicRepository } from "./db/repositories/topic-repository";
 import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
+import { PrivateGroupRepository } from "./db/repositories/private-group-repository";
+import { PrivateGroupMemberRepository } from "./db/repositories/private-group-member-repository";
 import { registerAllHandlers } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
@@ -87,6 +90,8 @@ app.whenReady().then(() => {
   const sessionRepo = new SessionRepository(db);
   const topicRepo = new TopicRepository(db);
   const subscriberRepo = new TopicSubscriberRepository(db);
+  const privateGroupRepo = new PrivateGroupRepository(db);
+  const privateGroupMemberRepo = new PrivateGroupMemberRepository(db);
 
   // 3. Create IPFS + Image services
   const ipfsService = new IpfsService();
@@ -191,6 +196,20 @@ app.whenReady().then(() => {
   topicService.setFileService(fileService);
   chatService.setTopicService(topicService);
 
+  const privateGroupService = new PrivateGroupService(
+    nknClient,
+    privateGroupRepo,
+    privateGroupMemberRepo,
+    messageRepo,
+    sessionRepo,
+    contactRepo,
+    pushToRenderer,
+  );
+  privateGroupService.setImageService(imageService);
+  privateGroupService.setAudioService(audioService);
+  privateGroupService.setFileService(fileService);
+  chatService.setPrivateGroupService(privateGroupService);
+
   const contactService = new ContactService(contactRepo, userDataPath);
   const sessionService = new SessionService(sessionRepo);
   const profileService = new ProfileService(db, userDataPath, pushToRenderer);
@@ -206,7 +225,7 @@ app.whenReady().then(() => {
   chatService.setContactProfileService(contactProfileService);
 
   // 7. Register IPC handlers
-  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService, profileService });
+  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService, profileService, privateGroupService });
 
   // App info handler
   ipcMain.handle(IPC.APP.GET_INFO, () => ({

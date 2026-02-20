@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../../stores/chat-store";
 import { useSessionStore } from "../../stores/session-store";
 import { useTopicStore } from "../../stores/topic-store";
+import { usePrivateGroupStore } from "../../stores/private-group-store";
 import { useContactStore } from "../../stores/contact-store";
 import type { TopicSubscriber } from "../../../shared/types";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
+import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
 
 /** Truncate an NKN address for display */
 function truncateAddr(addr: string): string {
@@ -143,13 +145,20 @@ export function MessageThread() {
   const sendTopicAudio = useChatStore((s) => s.sendTopicAudio);
   const sendFile = useChatStore((s) => s.sendFile);
   const sendTopicFile = useChatStore((s) => s.sendTopicFile);
+  const sendPrivateGroupImage = useChatStore((s) => s.sendPrivateGroupImage);
+  const sendPrivateGroupAudio = useChatStore((s) => s.sendPrivateGroupAudio);
+  const sendPrivateGroupFile = useChatStore((s) => s.sendPrivateGroupFile);
   const sessions = useSessionStore((s) => s.sessions);
   const loadSessions = useSessionStore((s) => s.loadSessions);
   const topics = useTopicStore((s) => s.topics);
   const leaveTopic = useTopicStore((s) => s.leaveTopic);
+  const groups = usePrivateGroupStore((s) => s.groups);
+  const quitGroup = usePrivateGroupStore((s) => s.quitGroup);
+  const contacts = useContactStore((s) => s.contacts);
 
   const [leaving, setLeaving] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevSessionRef = useRef<string | null>(null);
@@ -158,13 +167,21 @@ export function MessageThread() {
   const messages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
   const session = sessions.find((s) => s.id === activeSessionId);
   const isTopic = session?.type === "topic";
+  const isPrivateGroup = session?.type === "privateGroup";
+  const isGroup = isTopic || isPrivateGroup;
   const topicName = isTopic ? session.targetAddress : null;
   const topic = topicName ? topics.find((t) => t.id === topicName) : null;
+  const groupId = isPrivateGroup ? session.targetAddress : null;
+  const group = groupId ? groups.find((g) => g.groupId === groupId) : null;
+  const isDirect = session && !isTopic && !isPrivateGroup;
+  const displayName = (isDirect
+    ? (contacts.find((c) => c.address === session.targetAddress)?.name || session.targetName)
+    : session?.targetName) || "";
 
-  // Close members panel when switching away from a topic
+  // Close members panel when switching away from a group/topic
   useEffect(() => {
-    if (!isTopic) setShowMembers(false);
-  }, [activeSessionId, isTopic]);
+    if (!isGroup) setShowMembers(false);
+  }, [activeSessionId, isGroup]);
 
   // Scroll to bottom: instantly on session switch, smoothly on new messages
   useEffect(() => {
@@ -193,6 +210,8 @@ export function MessageThread() {
     if (!session) return;
     if (isTopic && topicName) {
       window.dchat.topic.sendMessage(topicName, content).catch(console.error);
+    } else if (isPrivateGroup && groupId) {
+      window.dchat.privateGroup.sendMessage(groupId, content).catch(console.error);
     } else {
       sendMessage(session.targetAddress, content);
     }
@@ -201,7 +220,9 @@ export function MessageThread() {
   function handleSendImage() {
     if (session && isTopic && topicName) {
       sendTopicImage(topicName);
-    } else if (session && !isTopic) {
+    } else if (session && isPrivateGroup && groupId) {
+      sendPrivateGroupImage(groupId);
+    } else if (session && !isGroup) {
       sendImage(session.targetAddress);
     }
   }
@@ -209,7 +230,9 @@ export function MessageThread() {
   function handleSendAudio(audioBuffer: ArrayBuffer, durationSeconds: number) {
     if (session && isTopic && topicName) {
       sendTopicAudio(topicName, audioBuffer, durationSeconds);
-    } else if (session && !isTopic) {
+    } else if (session && isPrivateGroup && groupId) {
+      sendPrivateGroupAudio(groupId, audioBuffer, durationSeconds);
+    } else if (session && !isGroup) {
       sendAudio(session.targetAddress, audioBuffer, durationSeconds);
     }
   }
@@ -217,7 +240,9 @@ export function MessageThread() {
   function handleSendFile() {
     if (session && isTopic && topicName) {
       sendTopicFile(topicName);
-    } else if (session && !isTopic) {
+    } else if (session && isPrivateGroup && groupId) {
+      sendPrivateGroupFile(groupId);
+    } else if (session && !isGroup) {
       sendFile(session.targetAddress);
     }
   }
@@ -236,20 +261,38 @@ export function MessageThread() {
     }
   }
 
+  async function handleLeaveGroup() {
+    if (!groupId) return;
+    setLeaving(true);
+    try {
+      await quitGroup(groupId);
+      await loadSessions();
+      useChatStore.getState().setActiveSession(null);
+    } catch (err) {
+      console.error("Failed to leave group:", err);
+    } finally {
+      setLeaving(false);
+    }
+  }
+
   return (
     <div className="flex-1 flex min-h-0">
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            isTopic ? "bg-primary-900" : "bg-gray-700"
+            isTopic ? "bg-primary-900" : isPrivateGroup ? "bg-emerald-900" : "bg-gray-700"
           }`}>
-            <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : "text-gray-300"}`}>
-              {isTopic ? "#" : session.targetName.charAt(0).toUpperCase()}
+            <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : isPrivateGroup ? "text-emerald-300" : "text-gray-300"}`}>
+              {isTopic ? "#" : isPrivateGroup ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              ) : displayName.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-200">{session.targetName}</div>
+            <div className="text-sm font-medium text-gray-200">{displayName}</div>
             {isTopic ? (
               <button
                 onClick={() => setShowMembers(!showMembers)}
@@ -257,13 +300,20 @@ export function MessageThread() {
               >
                 {topic?.memberCount ?? 0} members {showMembers ? "\u25B4" : "\u25BE"}
               </button>
+            ) : isPrivateGroup ? (
+              <button
+                onClick={() => setShowMembers(!showMembers)}
+                className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                {group?.count ?? 0} members {showMembers ? "\u25B4" : "\u25BE"}
+              </button>
             ) : (
               <div className="text-[10px] text-gray-500 truncate max-w-[300px]">
                 {session.targetAddress}
               </div>
             )}
           </div>
-          {isTopic && (
+          {isGroup && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowMembers(!showMembers)}
@@ -279,7 +329,7 @@ export function MessageThread() {
                 </svg>
               </button>
               <button
-                onClick={handleLeaveTopic}
+                onClick={() => setShowLeaveConfirm(true)}
                 disabled={leaving}
                 className="px-3 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
               >
@@ -299,7 +349,7 @@ export function MessageThread() {
             </div>
           )}
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} showSender={isTopic} />
+            <MessageBubble key={msg.id} message={msg} showSender={isGroup} />
           ))}
           <div ref={messagesEndRef} />
         </div>
@@ -313,9 +363,49 @@ export function MessageThread() {
         />
       </div>
 
-      {/* Subscriber panel */}
+      {/* Subscriber / Member panel */}
       {isTopic && topicName && showMembers && (
         <SubscriberPanel topicName={topicName} onClose={() => setShowMembers(false)} />
+      )}
+      {isPrivateGroup && groupId && showMembers && (
+        <PrivateGroupMemberPanel groupId={groupId} onClose={() => setShowMembers(false)} />
+      )}
+
+      {/* Leave confirmation dialog */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-white text-base font-semibold mb-2">
+              Leave {isPrivateGroup ? "Group" : "Topic"}
+            </h3>
+            <p className="text-gray-400 text-sm mb-5">
+              Are you sure you want to leave <span className="text-white font-medium">{displayName}</span>?
+              {isPrivateGroup && " This action cannot be undone and the conversation will be removed."}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowLeaveConfirm(false);
+                  if (isTopic) {
+                    await handleLeaveTopic();
+                  } else {
+                    await handleLeaveGroup();
+                  }
+                }}
+                disabled={leaving}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {leaving ? "Leaving..." : "Leave"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

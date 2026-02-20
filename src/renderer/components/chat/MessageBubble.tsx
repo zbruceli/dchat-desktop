@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
+import { usePrivateGroupStore } from "../../stores/private-group-store";
 import { ImageModal } from "./ImageModal";
 import { AudioContent } from "./AudioContent";
 import { FileContent } from "./FileContent";
@@ -153,6 +154,85 @@ function ImageContent({ message }: { message: Message }) {
   );
 }
 
+function InvitationContent({ message }: { message: Message }) {
+  const acceptInvitation = usePrivateGroupStore((s) => s.acceptInvitation);
+  const groups = usePrivateGroupStore((s) => s.groups);
+  const [accepting, setAccepting] = useState(false);
+
+  let groupName = "Unknown Group";
+  let groupId = "";
+  try {
+    const payload = JSON.parse(message.content);
+    // nMobile uses "name", D-Chat legacy uses "groupName"
+    groupName = payload.name || payload.groupName || groupName;
+    groupId = payload.groupId || "";
+  } catch {
+    // ignore
+  }
+
+  const group = groups.find((g) => g.groupId === groupId);
+  const alreadyJoined = group?.joined === true;
+
+  async function handleAccept() {
+    if (!groupId) return;
+    setAccepting(true);
+    try {
+      await acceptInvitation(groupId);
+    } catch (err) {
+      console.error("Failed to accept invitation:", err);
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  // Outbound: sender sees "Invited X to join GroupName"
+  if (message.isOutbound) {
+    let inviteeName = "";
+    try {
+      const p = JSON.parse(message.content);
+      inviteeName = p.invitee ? truncateAddress(p.invitee) : "";
+    } catch { /* ignore */ }
+    return (
+      <div className="space-y-1">
+        <p className="text-sm">
+          Invited {inviteeName ? <span className="font-medium">{inviteeName}</span> : "someone"} to join{" "}
+          <span className="font-semibold">{groupName}</span>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        Invited you to join <span className="font-semibold">{groupName}</span>
+      </p>
+      {!alreadyJoined && (
+        <button
+          onClick={handleAccept}
+          disabled={accepting}
+          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs rounded transition-colors"
+        >
+          {accepting ? "Accepting..." : "Accept"}
+        </button>
+      )}
+      {alreadyJoined && (
+        <span className="text-xs text-emerald-400">Joined</span>
+      )}
+    </div>
+  );
+}
+
+function ControlMessageContent({ message }: { message: Message }) {
+  return (
+    <div className="text-center py-1">
+      <span className="text-[10px] text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded">
+        {message.content}
+      </span>
+    </div>
+  );
+}
+
 /** Truncate an NKN address for display */
 function truncateAddress(addr: string): string {
   if (addr.length <= 16) return addr;
@@ -163,6 +243,38 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
   const contacts = useContactStore((s) => s.contacts);
   const opts = parseOptions(message);
+
+  // Private group control messages render as centered notifications
+  const isControlMessage =
+    message.contentType === "privateGroup:subscribe" ||
+    message.contentType === "privateGroup:quit";
+
+  if (isControlMessage) {
+    return <ControlMessageContent message={message} />;
+  }
+
+  // Private group invitation renders with Accept button
+  if (message.contentType === "privateGroup:invitation") {
+    return (
+      <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} mb-1`}>
+        <div className={`max-w-[70%] px-3 py-2 rounded-2xl ${
+          isOutbound
+            ? "bg-primary-600 text-white rounded-br-md"
+            : "bg-gray-800 text-gray-200 rounded-bl-md"
+        }`}>
+          <InvitationContent message={message} />
+          <div className={`flex items-center justify-end gap-1 mt-0.5 ${
+            isOutbound ? "text-primary-200" : "text-gray-500"
+          }`}>
+            <span className="text-[10px]">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isAudio = message.contentType === "audio";
   const isIpfsAudio =
     message.contentType === "ipfs" &&

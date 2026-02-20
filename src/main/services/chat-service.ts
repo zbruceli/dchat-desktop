@@ -4,6 +4,8 @@ import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
 import type { FileService } from "./file-service";
 import type { TopicService } from "./topic-service";
+import type { PrivateGroupService } from "./private-group-service";
+import { PRIVATE_GROUP_CONTROL_TYPES } from "./private-group-service";
 import type { ContactProfileService } from "./contact-profile-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
@@ -34,6 +36,7 @@ export class ChatService {
   private audioService: AudioService | null = null;
   private fileService: FileService | null = null;
   private topicService: TopicService | null = null;
+  private privateGroupService: PrivateGroupService | null = null;
   private contactProfileService: ContactProfileService | null = null;
 
   constructor(
@@ -56,8 +59,8 @@ export class ChatService {
       const byTarget = new Map<string, typeof allSessions>();
 
       for (const session of allSessions) {
-        // Skip topic sessions — they use their own ID scheme (topic:{name})
-        if (session.type === "topic") continue;
+        // Skip topic and privateGroup sessions — they use their own ID schemes
+        if (session.type === "topic" || session.type === "privateGroup") continue;
         const existing = byTarget.get(session.targetAddress) ?? [];
         existing.push(session);
         byTarget.set(session.targetAddress, existing);
@@ -103,6 +106,10 @@ export class ChatService {
 
   setTopicService(topicService: TopicService): void {
     this.topicService = topicService;
+  }
+
+  setPrivateGroupService(privateGroupService: PrivateGroupService): void {
+    this.privateGroupService = privateGroupService;
   }
 
   setContactProfileService(service: ContactProfileService): void {
@@ -381,14 +388,40 @@ export class ChatService {
   }
 
   private handleIncomingMessage(src: string, payload: string): void {
-    let messageData: MessageData;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let raw: any;
     try {
-      messageData = JSON.parse(payload);
+      raw = JSON.parse(payload);
     } catch {
       return; // ignore malformed messages
     }
 
+    // nMobile sends content as object for private group control messages — normalize to JSON string
+    if (raw.content && typeof raw.content === "object") {
+      raw.content = JSON.stringify(raw.content);
+    }
+
+    const messageData = raw as MessageData;
     const contentType = messageData.contentType ?? "text";
+
+    // Route private group control messages
+    if (PRIVATE_GROUP_CONTROL_TYPES.has(contentType)) {
+      if (this.privateGroupService) {
+        console.log(`[ChatService] Routing ${contentType} from ${src.substring(0, 16)}... to PrivateGroupService`);
+        this.privateGroupService.handleIncomingControlMessage(src, messageData);
+      } else {
+        console.warn(`[ChatService] Received ${contentType} but privateGroupService not set`);
+      }
+      return;
+    }
+
+    // Route private group messages (messages with a groupId field)
+    if (messageData.groupId && this.privateGroupService) {
+      if (DISPLAYABLE_TYPES.has(contentType)) {
+        this.privateGroupService.handleIncomingGroupMessage(src, messageData);
+      }
+      return;
+    }
 
     // Route topic control messages (subscribe/unsubscribe notifications)
     if (TOPIC_CONTROL_TYPES.has(contentType) && this.topicService) {

@@ -4,6 +4,7 @@ import { up as migration002 } from "./002-add-message-options";
 import { up as migration003 } from "./003-add-thumbnail-path";
 import { up as migration004 } from "./004-add-topic-tables";
 import { up as migration005 } from "./005-add-contact-profile-version";
+import { up as migration006 } from "./006-add-private-group-tables";
 
 interface Migration {
   version: number;
@@ -16,6 +17,7 @@ const migrations: Migration[] = [
   { version: 3, up: migration003 },
   { version: 4, up: migration004 },
   { version: 5, up: migration005 },
+  { version: 6, up: migration006 },
 ];
 
 export function runMigrations(db: Database.Database): void {

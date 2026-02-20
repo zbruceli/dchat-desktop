@@ -13,7 +13,15 @@ export type MessageContentType =
   | "deviceInfo"
   | "deviceRequest"
   | "topic:subscribe"
-  | "topic:unsubscribe";
+  | "topic:unsubscribe"
+  | "privateGroup:invitation"
+  | "privateGroup:accept"
+  | "privateGroup:subscribe"
+  | "privateGroup:quit"
+  | "privateGroup:optionRequest"
+  | "privateGroup:optionResponse"
+  | "privateGroup:memberRequest"
+  | "privateGroup:memberResponse";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 
@@ -54,6 +62,7 @@ export interface MessageData {
   content?: string;
   options?: MessageOptions;
   topic?: string;
+  groupId?: string;
   timestamp: number;
 }
 

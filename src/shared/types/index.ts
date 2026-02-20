@@ -18,4 +18,11 @@ export type { ClientStatus } from "./client";
 
 export type { Topic, TopicSubscriber } from "./topic";
 
+export type {
+  PrivateGroup,
+  PrivateGroupMember,
+  PrivateGroupPermission,
+} from "./private-group";
+export { PrivateGroupItemPerm } from "./private-group";
+
 export type { Profile } from "./profile";

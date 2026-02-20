@@ -8,7 +8,7 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 public group chat, and Phase 4 NKN wallet are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, and wallet support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, send/receive NKN tokens, and interoperate with nMobile.
+Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), and Phase 4 NKN wallet are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, and wallet support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile.
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
@@ -17,6 +17,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 public group chat, and P
 - **Voice messaging** — Record WebM/Opus via MediaRecorder, convert to AAC-ADTS via ffmpeg, send inline as base64 data-URI, nMobile-compatible (`src/main/services/audio-service.ts`)
 - **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, nMobile-compatible wire format with `fileType: 0`, open with system default app (`src/main/services/file-service.ts`)
 - **Group chat (public topics)** — Join/leave NKN blockchain-based topic groups, nMobile-compatible: topic name hashed via SHA-1 (`"dchat" + hex(sha1(name))`), subscribe/unsubscribe blockchain transactions, subscriber list cached locally, messages sent individually to all subscribers, image, voice, and file message support (`src/main/services/topic-service.ts`)
+- **Private groups** — Off-chain, signature-based membership groups with owner/admin/member permissions. Ed25519 dual-signatures (inviter + invitee) for membership proof. Create groups, invite members, accept invitations, leave groups, kick members, full member sync protocol. Text, image, voice, and file messaging within groups. nMobile-interoperable wire format. (`src/main/services/private-group-service.ts`)
 - **IPFS integration** — Upload/download encrypted files to nMobile's IPFS nodes (default `64.225.88.71:80`), multi-gateway fallback (`src/main/services/ipfs-service.ts`)
 - **Image processing** — Resize, thumbnail generation (120x120), AES-128-GCM encryption, local caching (`src/main/services/image-service.ts`)
 - **Audio processing** — WebM→AAC-ADTS conversion via ffmpeg (mono, 48kbps, 22050Hz), local caching in `audio-cache/` (`src/main/services/audio-service.ts`)
@@ -25,20 +26,23 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 public group chat, and P
 - **Custom protocol** — `dchat-media://` file protocol for serving cached images, audio, and files to renderer securely (with explicit MIME types)
 - **Contact management** — Add/delete contacts by NKN address, auto-create contacts for unknown senders (`src/main/services/contact-service.ts`)
 - **SQLite database** — `better-sqlite3` with WAL mode, foreign keys, version-based migrations (`src/main/db/`)
-- **Repository pattern** — MessageRepository, ContactRepository, SessionRepository, TopicRepository, TopicSubscriberRepository with typed row mapping
+- **Ed25519 signature crypto** — Sign/verify with nkn-sdk + libsodium, SHA256→hex→Ed25519 signature chain, group version generation (MD5-based), nMobile-compatible (`src/main/crypto/ed25519-signature.ts`)
+- **Repository pattern** — MessageRepository, ContactRepository, SessionRepository, TopicRepository, TopicSubscriberRepository, PrivateGroupRepository, PrivateGroupMemberRepository with typed row mapping
 - **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page (`src/main/services/profile-service.ts`)
-- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile (`src/main/ipc/`)
+- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
-- **Zustand stores** — Client, chat, contact, session, topic, profile stores with IPC subscription hooks (`src/renderer/stores/`)
+- **Zustand stores** — Client, chat, contact, session, topic, profile, private group stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
-- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
+- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
+- **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with invite/kick, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
+- **Error boundary** — React ErrorBoundary catches rendering crashes and displays error details with a retry button (`src/renderer/App.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
 - **Connection status** — Avatar circle with green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
@@ -51,7 +55,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 public group chat, and P
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - Message receipts (delivered/read status)
 - Video sharing
-- Private groups (off-chain, signature-based membership)
+- ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - Media messages in topics (video — images, audio, and file now supported)
 - Desktop notifications
 
@@ -119,11 +123,13 @@ dchat/
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import/transfer/addressFromClient (NKN SDK)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
+│   │   │   ├── private-group-handlers.ts # ✅ privateGroup:create/list/get/invite/accept/quit/kick/getMembers/sendMessage/sendImage/sendAudio/sendFile
 │   │   │   └── profile-handlers.ts # ✅ profile:get/setNickname/pickAvatar/setAvatar
 │   │   ├── services/                # Business logic (mirrors nMobile common/)
 │   │   │   ├── nkn-client-service.ts # ✅ NKN MultiClient wrapper, connect/send/sendNoReply/subscribe/unsubscribe/getSubscribers/sendToMultiple
-│   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image + audio + file messaging, topic message routing
+│   │   │   ├── chat-service.ts      # ✅ Send/receive orchestration, dedup, session mgmt, image + audio + file messaging, topic + private group message routing
 │   │   │   ├── topic-service.ts     # ✅ Topic join/leave, subscriber sync, topic message send/receive, control messages, image + audio + file send/receive
+│   │   │   ├── private-group-service.ts # ✅ Private group lifecycle (create/invite/accept/quit/kick), member sync, Ed25519 signatures, group messaging (text/image/audio/file)
 │   │   │   ├── audio-service.ts     # ✅ WebM→AAC conversion, inline base64 encoding, IPFS audio download/decrypt
 │   │   │   ├── image-service.ts     # ✅ Image resize, thumbnail, AES-GCM encrypt, IPFS upload/download
 │   │   │   ├── file-service.ts      # ✅ Generic file encrypt, IPFS upload/download, cache in file-cache/
@@ -134,19 +140,24 @@ dchat/
 │   │   ├── db/                      # Data access layer
 │   │   │   ├── database.ts          # ✅ SQLite singleton (init/get/close, WAL, FK)
 │   │   │   ├── migrations/
-│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (4 migrations)
+│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (6 migrations)
 │   │   │   │   ├── 001-initial-schema.ts  # ✅ contact, session, message, settings tables
 │   │   │   │   ├── 002-add-message-options.ts # ✅ options + local_file_path columns on message
 │   │   │   │   ├── 003-add-thumbnail-path.ts  # ✅ thumbnail_local_file_path column on message
-│   │   │   │   └── 004-add-topic-tables.ts   # ✅ topic + topic_subscriber tables
+│   │   │   │   ├── 004-add-topic-tables.ts   # ✅ topic + topic_subscriber tables
+│   │   │   │   ├── 005-add-contact-profile-version.ts # ✅ profile_version column on contact
+│   │   │   │   └── 006-add-private-group-tables.ts    # ✅ private_group + private_group_member tables
 │   │   │   └── repositories/
 │   │   │       ├── message-repository.ts  # ✅ insert, findBySessionId, updateStatus, updateOptions, updateLocalFilePath, updateThumbnailLocalFilePath, updateContentType
 │   │   │       ├── contact-repository.ts  # ✅ upsert, findByAddress, findAll, delete
 │   │   │       ├── session-repository.ts  # ✅ upsert, findAll, updateLastMessage, unread
 │   │   │       ├── topic-repository.ts    # ✅ upsert, findById, findAll, findJoined, setJoined, setMemberCount
-│   │   │       └── topic-subscriber-repository.ts # ✅ upsert, findByTopicId, replaceAll, delete
+│   │   │       ├── topic-subscriber-repository.ts # ✅ upsert, findByTopicId, replaceAll, delete
+│   │   │       ├── private-group-repository.ts    # ✅ upsert, findById, findAll, findJoined, setJoined, setCount, setVersion, setSignature, deleteById
+│   │   │       └── private-group-member-repository.ts # ✅ upsert, findByGroupId, findByGroupIdAndInvitee, findActiveMembers, updatePermission, deleteByGroupId
 │   │   └── crypto/
-│   │       └── aes-gcm.ts          # ✅ AES-128-GCM encrypt/decrypt (nMobile-compatible)
+│   │       ├── aes-gcm.ts          # ✅ AES-128-GCM encrypt/decrypt (nMobile-compatible)
+│   │       └── ed25519-signature.ts # ✅ Ed25519 sign/verify, SHA256→hex→sign, group version (MD5), nMobile-compatible
 │   ├── renderer/                    # Electron renderer process (React app)
 │   │   ├── index.html               # ✅ HTML shell with CSP (incl. media-src for audio playback)
 │   │   ├── main.tsx                 # ✅ React entry point
@@ -158,6 +169,8 @@ dchat/
 │   │   │   ├── contact-store.ts     # ✅ Contact list, add/delete
 │   │   │   ├── session-store.ts     # ✅ Session list, real-time updates, delete events
 │   │   │   ├── topic-store.ts       # ✅ Topic list, create/join/leave, subscriber fetch, real-time updates
+│   │   │   ├── private-group-store.ts # ✅ Private group list, create/invite/accept/quit/kick, member fetch, real-time updates
+│   │   │   ├── nav-store.ts        # ✅ Active navigation tab state
 │   │   │   └── profile-store.ts    # ✅ Profile state, load/setNickname/pickAndSetAvatar, push event updates
 │   │   ├── pages/
 │   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import/restore wallet + connect
@@ -174,7 +187,8 @@ dchat/
 │   │   │   │   ├── FileContent.tsx  # ✅ File display (doc icon, name, size, download/open/retry)
 │   │   │   │   ├── AudioContent.tsx # ✅ Audio player (play/pause, progress bar, duration)
 │   │   │   │   ├── VoiceRecordButton.tsx # ✅ Click-to-record mic button (0.5s–60s, cancel, send)
-│   │   │   │   └── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
+│   │   │   │   ├── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
+│   │   │   │   └── PrivateGroupMemberPanel.tsx # ✅ Member list with invite/kick, permission badges, leave button
 │   │   │   └── common/
 │   │   │       └── ConnectionStatus.tsx # ✅ Avatar circle + status dot overlay + nickname + profile editing popover
 │   │   ├── hooks/
@@ -184,15 +198,16 @@ dchat/
 │   ├── shared/                      # Shared between main and renderer
 │   │   ├── types/
 │   │   │   ├── index.ts             # ✅ Barrel re-export
-│   │   │   ├── message.ts           # ✅ Message, MessageData (with topic field), MessageOptions, MessageStatus, SendMessageParams
+│   │   │   ├── message.ts           # ✅ Message, MessageData (with topic + groupId fields), MessageOptions, MessageStatus, SendMessageParams
 │   │   │   ├── contact.ts           # ✅ Contact, AddContactParams
 │   │   │   ├── session.ts           # ✅ Session, SessionType
 │   │   │   ├── wallet.ts            # ✅ WalletInfo, CreateWalletParams, ImportWalletParams
 │   │   │   ├── client.ts            # ✅ ClientStatus
 │   │   │   ├── topic.ts             # ✅ Topic, TopicSubscriber
+│   │   │   ├── private-group.ts    # ✅ PrivateGroup, PrivateGroupMember, PrivateGroupItemPerm
 │   │   │   └── profile.ts          # ✅ Profile (nickname, avatarPath, profileVersion)
 │   │   ├── constants.ts             # ✅ App constants, NKN seed servers
-│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. TOPIC section, session/topic delete events)
+│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. TOPIC + PRIVATE_GROUP sections, session/topic/group delete events)
 │   └── preload/
 │       └── index.ts                 # ✅ contextBridge API with typed returns + push listeners
 ├── tests/
@@ -305,7 +320,8 @@ interface MessageData {
   contentType: string;  // text, textExtension, image, audio, video, file, ipfs, piece, topic:subscribe, ...
   content?: string;     // For ipfs: IPFS CID hash
   options?: MessageOptions;  // IPFS metadata, encryption keys, file info
-  topic?: string;       // Topic name for group messages
+  topic?: string;       // Topic name for public group messages
+  groupId?: string;     // Group ID for private group messages
   timestamp: number;
 }
 ```
@@ -438,34 +454,40 @@ Key conventions:
 - `receipt` — Delivery/read confirmation
 - `contact`, `contactOptions` — Profile sync
 - `deviceInfo`, `deviceRequest` — Multi-device coordination
-- `topicInvitation`, `topicSubscribe`, `topicUnsubscribe` — Group management
-- `privateGroupInvitation`, `privateGroupAccept`, `privateGroupQuit` — Private group lifecycle
+- `topic:subscribe`, `topic:unsubscribe` — Public group join/leave
+- `privateGroup:invitation`, `privateGroup:accept`, `privateGroup:subscribe`, `privateGroup:quit` — Private group lifecycle
+- `privateGroup:optionRequest`, `privateGroup:optionResponse` — Private group version sync
+- `privateGroup:memberRequest`, `privateGroup:memberResponse` — Private group member sync
 
 ### Three Chat Paradigms
 1. **1-to-1**: Direct NKN messages between two addresses
 2. **Topics (Public Groups)**: Sender fetches subscriber list from blockchain and sends to each subscriber individually (NOT via topic publish). Topic name is hashed (`"dchat" + sha1(name)`) for NKN API calls. Subscription is a blockchain transaction (~93 day duration). **Implemented.**
-3. **Private Groups**: Messages sent individually to each member's NKN address; membership managed by cryptographic signatures (not on-chain). **Not yet implemented.**
+3. **Private Groups**: Messages sent individually to each member's NKN address; membership managed by Ed25519 dual-signatures (inviter + invitee). Group ID format: `{ownerPublicKey}.{uuidV4}`. Session ID: `privateGroup:{groupId}`. Permissions: owner(30) > admin(20) > normal(10). Member sync via `optionRequest`/`optionResponse` and `memberRequest`/`memberResponse` control messages. **Implemented.**
 
 ## Database Schema
 
-### Implemented (migrations 001–004)
+### Implemented (migrations 001–006)
 
 | Table | Purpose |
 |---|---|
-| `contact` | User contacts with profile data (PK: `address`) |
+| `contact` | User contacts with profile data, profile_version (PK: `address`) |
 | `session` | Conversation threads with last message preview and unread count (PK: `id`) |
 | `message` | All chat messages with content, status, options (JSON), local_file_path, thumbnail_local_file_path (FK → `session`) |
 | `settings` | App configuration key-value pairs (stores wallet keystore, IPFS config, etc.) |
 | `topic` | Public group metadata: joined status, subscribe time, expiry block height, member count (PK: `id`) |
 | `topic_subscriber` | Cached subscriber list per topic (PK: `topic_id, contact_address`) |
+| `private_group` | Private group metadata: name, type, joined status, version, signature, member count (PK: `group_id`) |
+| `private_group_member` | Private group members with Ed25519 dual-signatures, permissions, expiry (PK: `group_id, invitee`) |
 
-Indexes: `idx_session_last_message_at`, `idx_message_session_id`, `idx_message_nkn_message_id`, `idx_topic_subscriber_topic_id`
+Indexes: `idx_session_last_message_at`, `idx_message_session_id`, `idx_message_nkn_message_id`, `idx_topic_subscriber_topic_id`, `idx_pgm_group_id`
 
 Migration history:
 - **001**: Initial schema — contact, session, message, settings tables
 - **002**: Add `options` (TEXT) and `local_file_path` (TEXT) columns to message
 - **003**: Add `thumbnail_local_file_path` (TEXT) column to message
 - **004**: Add `topic` and `topic_subscriber` tables for group chat
+- **005**: Add `profile_version` (TEXT) column to contact
+- **006**: Add `private_group` and `private_group_member` tables for private groups
 
 ### Planned (future migrations)
 
@@ -473,8 +495,6 @@ Migration history:
 |---|---|
 | `message_piece` | Erasure-coded message fragments |
 | `wallet` | Encrypted wallet keystores |
-| `private_group` | Private group membership and signatures |
-| `private_group_item` | Individual member records within private groups |
 | `device_info` | Multi-device metadata |
 
 ## Key Technical Decisions

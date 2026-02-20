@@ -6,6 +6,7 @@ import type { ClientStatus } from "../../shared/types";
 export class NknClientService extends EventEmitter {
   private client: nkn.MultiClient | null = null;
   private status: ClientStatus = { state: "disconnected" };
+  private seed: string | undefined;
 
   getStatus(): ClientStatus {
     return { ...this.status };
@@ -16,6 +17,7 @@ export class NknClientService extends EventEmitter {
       await this.disconnect();
     }
 
+    this.seed = seed;
     this.updateStatus({ state: "connecting" });
 
     try {
@@ -61,6 +63,7 @@ export class NknClientService extends EventEmitter {
     } catch (err) {
       this.updateStatus({ state: "disconnected" });
       this.client = null;
+      this.seed = undefined;
       throw err;
     }
   }
@@ -74,7 +77,18 @@ export class NknClientService extends EventEmitter {
       }
       this.client = null;
     }
+    this.seed = undefined;
     this.updateStatus({ state: "disconnected" });
+  }
+
+  getSeed(): string | undefined {
+    return this.seed;
+  }
+
+  getKeyPair(): { privateKey: Uint8Array } {
+    if (!this.seed) throw new Error("NKN client not connected");
+    const kp = nkn.crypto.keyPair(this.seed);
+    return { privateKey: kp.privateKey };
   }
 
   async sendMessage(dest: string, data: string): Promise<void> {

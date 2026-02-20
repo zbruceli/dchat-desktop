@@ -1,11 +1,13 @@
 import React from "react";
 import { useSessionStore } from "../../stores/session-store";
 import { useChatStore } from "../../stores/chat-store";
+import { useContactStore } from "../../stores/contact-store";
 
 export function SessionList() {
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
+  const contacts = useContactStore((s) => s.contacts);
 
   if (sessions.length === 0) {
     return (
@@ -22,6 +24,12 @@ export function SessionList() {
       {sessions.map((session) => {
         const isActive = session.id === activeSessionId;
         const isTopic = session.type === "topic";
+        const isPrivateGroup = session.type === "privateGroup";
+        const isDirect = !isTopic && !isPrivateGroup;
+        // For 1-to-1 sessions, resolve contact name at render time
+        const displayName = (isDirect
+          ? (contacts.find((c) => c.address === session.targetAddress)?.name || session.targetName)
+          : session.targetName) || "";
         const preview = session.lastMessageContent || "No messages yet";
         const time = session.lastMessageAt
           ? new Date(session.lastMessageAt).toLocaleTimeString([], {
@@ -39,16 +47,20 @@ export function SessionList() {
             }`}
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isTopic ? "bg-primary-900" : "bg-gray-700"
+              isTopic ? "bg-primary-900" : isPrivateGroup ? "bg-emerald-900" : "bg-gray-700"
             }`}>
-              <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : "text-gray-300"}`}>
-                {isTopic ? "#" : session.targetName.charAt(0).toUpperCase()}
+              <span className={`text-sm ${isTopic ? "text-primary-300 font-bold" : isPrivateGroup ? "text-emerald-300" : "text-gray-300"}`}>
+                {isTopic ? "#" : isPrivateGroup ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                ) : displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-200 truncate">
-                  {session.targetName}
+                  {displayName}
                 </span>
                 <span className="text-[10px] text-gray-500 flex-shrink-0 ml-2">{time}</span>
               </div>

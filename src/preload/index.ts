@@ -8,6 +8,8 @@ import type {
   Topic,
   TopicSubscriber,
   Profile,
+  PrivateGroup,
+  PrivateGroupMember,
 } from "../shared/types";
 
 const api = {
@@ -185,6 +187,44 @@ const api = {
         callback(profile);
       ipcRenderer.on("profile:onUpdate", handler);
       return () => ipcRenderer.removeListener("profile:onUpdate", handler);
+    },
+  },
+  privateGroup: {
+    create: (name: string): Promise<PrivateGroup> =>
+      ipcRenderer.invoke("privateGroup:create", name),
+    list: (): Promise<PrivateGroup[]> =>
+      ipcRenderer.invoke("privateGroup:list"),
+    get: (groupId: string): Promise<PrivateGroup | null> =>
+      ipcRenderer.invoke("privateGroup:get", groupId),
+    invite: (groupId: string, targetAddress: string): Promise<void> =>
+      ipcRenderer.invoke("privateGroup:invite", groupId, targetAddress),
+    accept: (groupId: string): Promise<void> =>
+      ipcRenderer.invoke("privateGroup:accept", groupId),
+    quit: (groupId: string): Promise<void> =>
+      ipcRenderer.invoke("privateGroup:quit", groupId),
+    kick: (groupId: string, targetAddress: string): Promise<void> =>
+      ipcRenderer.invoke("privateGroup:kick", groupId, targetAddress),
+    getMembers: (groupId: string): Promise<PrivateGroupMember[]> =>
+      ipcRenderer.invoke("privateGroup:getMembers", groupId),
+    sendMessage: (groupId: string, content: string, contentType?: string): Promise<Message> =>
+      ipcRenderer.invoke("privateGroup:sendMessage", groupId, content, contentType),
+    sendImage: (groupId: string, filePath: string): Promise<Message> =>
+      ipcRenderer.invoke("privateGroup:sendImage", groupId, filePath),
+    sendAudio: (groupId: string, audioBuffer: ArrayBuffer, durationSeconds: number): Promise<Message> =>
+      ipcRenderer.invoke("privateGroup:sendAudio", groupId, audioBuffer, durationSeconds),
+    sendFile: (groupId: string, filePath: string): Promise<Message> =>
+      ipcRenderer.invoke("privateGroup:sendFile", groupId, filePath),
+    onUpdate: (callback: (group: PrivateGroup) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, group: PrivateGroup) =>
+        callback(group);
+      ipcRenderer.on("privateGroup:onUpdate", handler);
+      return () => ipcRenderer.removeListener("privateGroup:onUpdate", handler);
+    },
+    onDelete: (callback: (groupId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, groupId: string) =>
+        callback(groupId);
+      ipcRenderer.on("privateGroup:onDelete", handler);
+      return () => ipcRenderer.removeListener("privateGroup:onDelete", handler);
     },
   },
 };
