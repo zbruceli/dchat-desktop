@@ -4,6 +4,12 @@ Decentralized, end-to-end encrypted desktop messenger built on the [NKN](https:/
 
 D-Chat Desktop is an Electron port of [nMobile](https://github.com/nknorg/nMobile), bringing private, serverless messaging to macOS, Windows, and Linux.
 
+## Downloads
+
+Pre-built binaries for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
+
+> **Note:** Current releases are unsigned. macOS users need to right-click → Open (or run `xattr -cr` on the app). Windows users may see a SmartScreen warning — click "More info" → "Run anyway".
+
 ## How It Works
 
 D-Chat sends messages through NKN's decentralized relay network of ~100,000 nodes. No central server ever sees your messages or metadata.
@@ -96,6 +102,9 @@ npm run package
 | `npm run dev` | Start dev mode — Vite hot reload + Electron |
 | `npm run build` | Production build (main + preload + renderer) |
 | `npm run package` | Build and package with electron-builder |
+| `npm run package:mac` | Package for macOS (DMG + ZIP) |
+| `npm run package:win` | Package for Windows (NSIS + portable) |
+| `npm run package:linux` | Package for Linux (AppImage + DEB) |
 | `npm run test` | Run unit tests with Vitest |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run lint` | Check code with ESLint |

@@ -8,19 +8,43 @@ files:
   - package.json
 asarUnpack:
   - "node_modules/@ffmpeg-installer/**"
+  - "node_modules/better-sqlite3-multiple-ciphers/**/*.node"
+  - "node_modules/sharp/**"
+publish:
+  provider: github
 mac:
   category: public.app-category.social-networking
+  icon: resources/icon.png
   extendInfo:
     NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
 win:
+  icon: resources/icon.png
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 linux:
   category: Network
+  icon: resources/icon.png
   target:
-    - AppImage
-    - deb
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64

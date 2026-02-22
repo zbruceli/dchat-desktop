@@ -49,6 +49,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Connection status** — Avatar with rounded-lg shape, green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
+- **Release pipeline** — GitHub Actions workflow builds unsigned binaries for macOS (x64 + arm64), Windows (x64), and Linux (x64) on tag push (`v*.*.*`), publishes to GitHub Releases. Platform package scripts: `package:mac`, `package:win`, `package:linux`. App icon (512x512 PNG with white "D" on dark background) auto-converted to `.icns`/`.ico` by electron-builder. See `RELEASING.md` for full docs. (`.github/workflows/release.yml`, `scripts/generate-icons.mjs`)
 - **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service
 
 ### What's not yet built
@@ -105,6 +106,7 @@ The original nMobile app (Flutter/Dart) has these key layers — our Electron po
 dchat/
 ├── CLAUDE.md                        # AI assistant context (this file)
 ├── README.md                        # User-facing documentation
+├── RELEASING.md                     # Release process documentation
 ├── package.json
 ├── electron-builder.yml             # Electron packaging config
 ├── vite.renderer.config.ts          # Vite config for renderer process
@@ -115,6 +117,11 @@ dchat/
 ├── postcss.config.js
 ├── .prettierrc
 ├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── release.yml              # ✅ GitHub Actions: build + publish on tag push (v*.*.*)
+├── scripts/
+│   └── generate-icons.mjs           # ✅ Generate app icon PNG from SVG (sharp)
 ├── src/
 │   ├── main/                        # Electron main process
 │   │   ├── index.ts                 # ✅ App entry, deferred DB init, two-phase IPC registration, protocol handler
@@ -248,6 +255,9 @@ npm run build:main     # TypeScript compile main process only
 npm run build:preload  # TypeScript compile preload only
 npm run build:renderer # Vite build renderer only
 npm run package        # Build + package with electron-builder
+npm run package:mac    # Build + package for macOS (DMG + ZIP)
+npm run package:win    # Build + package for Windows (NSIS + portable)
+npm run package:linux  # Build + package for Linux (AppImage + DEB)
 npm run test           # Run unit tests (Vitest)
 npm run test:watch     # Run tests in watch mode
 npm run test:e2e       # Run e2e tests (Playwright)
