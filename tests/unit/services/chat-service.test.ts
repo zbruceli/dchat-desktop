@@ -10,6 +10,22 @@ import type { ImageService, ProcessResult } from "../../../src/main/services/ima
 import type { NknClientService } from "../../../src/main/services/nkn-client-service";
 import type { MessageData, MessageOptions } from "../../../src/shared/types";
 
+// Mock electron Notification
+vi.mock("electron", () => ({
+  Notification: class MockNotification {
+    constructor(_opts: Record<string, unknown>) {}
+    on(_event: string, _cb: () => void) {}
+    show() {}
+  },
+}));
+
+// Mock getDatabase for showNotification global mute check
+vi.mock("../../../src/main/db/database", () => ({
+  getDatabase: () => {
+    throw new Error("no db in test");
+  },
+}));
+
 // --- Mocks ---
 
 class MockNknClient extends EventEmitter {

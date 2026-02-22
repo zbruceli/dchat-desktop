@@ -56,7 +56,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
 - **Release pipeline** — GitHub Actions workflow builds unsigned binaries for macOS (x64 + arm64), Windows (x64), and Linux (x64) on tag push (`v*.*.*`), publishes to GitHub Releases. Platform package scripts: `package:mac`, `package:win`, `package:linux`. App icon (512x512 PNG with white "D" on dark background) auto-converted to `.icns`/`.ico` by electron-builder. See `RELEASING.md` for full docs. (`.github/workflows/release.yml`, `scripts/generate-icons.mjs`)
-- **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service
+- **Test suite** — 340 unit tests covering crypto (AES-GCM, Ed25519), all 7 DB migrations, all 7 repositories, IPC settings handlers, and 10 services (chat, topic, private-group, file, audio, image, IPFS, session, contact, NKN client)
 
 ### What's not yet built
 - ~~SQLCipher encryption~~ (done — `better-sqlite3-multiple-ciphers` with SHA256(seed) key)
@@ -240,7 +240,15 @@ dchat/
 │   └── preload/
 │       └── index.ts                 # ✅ contextBridge API with typed returns + push listeners
 ├── tests/
+│   ├── helpers/                     # Shared test infrastructure
+│   │   ├── mock-nkn-client.ts       # ✅ MockNknClient EventEmitter for service tests
+│   │   ├── mock-services.ts         # ✅ Mock factories for ImageService, AudioService, FileService, IpfsService, etc.
+│   │   └── db-helpers.ts            # ✅ createTestDb(), makeMessage(), makeSession(), makeContact()
 │   ├── unit/
+│   │   ├── crypto/                  # ✅ aes-gcm (12), ed25519-signature (18)
+│   │   ├── db/                      # ✅ migrations (12+4), contact-repo (12), session-repo (14), topic-repo (11), topic-sub-repo (10), private-group-repo (11), private-group-member-repo (10), message-repo (9)
+│   │   ├── services/                # ✅ chat (23+34), topic (30), private-group (38), file (12), audio (14), image (11), ipfs (6), session (6), contact (10), nkn-client (14)
+│   │   └── ipc/                     # ✅ settings-handlers (8)
 │   └── e2e/
 └── resources/                       # App icons, assets
 ```
