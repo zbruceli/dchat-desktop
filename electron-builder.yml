@@ -18,23 +18,13 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
-        - arm64
+    - dmg
+    - zip
 win:
   icon: resources/icon.png
   target:
-    - target: nsis
-      arch:
-        - x64
-    - target: portable
-      arch:
-        - x64
+    - nsis
+    - portable
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -42,9 +32,5 @@ linux:
   category: Network
   icon: resources/icon.png
   target:
-    - target: AppImage
-      arch:
-        - x64
-    - target: deb
-      arch:
-        - x64
+    - AppImage
+    - deb
