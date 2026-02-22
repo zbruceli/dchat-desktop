@@ -132,6 +132,29 @@ export class MessageRepository {
       .run(contentType, Date.now(), id);
   }
 
+  updateStatusBatch(ids: string[], status: MessageStatus): void {
+    if (ids.length === 0) return;
+    const now = Date.now();
+    const placeholders = ids.map(() => "?").join(", ");
+    this.db
+      .prepare(
+        `UPDATE message SET status = ?, updated_at = ? WHERE id IN (${placeholders})`,
+      )
+      .run(status, now, ...ids);
+  }
+
+  findInboundBySessionIdAndStatus(
+    sessionId: string,
+    excludeStatus: MessageStatus,
+  ): Message[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM message WHERE session_id = ? AND is_outbound = 0 AND status != ? ORDER BY created_at ASC`,
+      )
+      .all(sessionId, excludeStatus) as MessageRow[];
+    return rows.map(rowToMessage);
+  }
+
   deleteBySessionId(sessionId: string): void {
     this.db.prepare(`DELETE FROM message WHERE session_id = ?`).run(sessionId);
   }

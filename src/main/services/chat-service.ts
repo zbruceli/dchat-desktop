@@ -443,7 +443,45 @@ export class ChatService {
       return;
     }
 
-    // Skip non-displayable message types (ping, receipt, device:*, read, etc.)
+    // Handle delivery receipt — update original message to "delivered"
+    if (contentType === "receipt" && raw.targetID) {
+      const original = this.messageRepo.findById(raw.targetID);
+      if (
+        original &&
+        original.isOutbound &&
+        (original.status === "sending" || original.status === "sent")
+      ) {
+        this.messageRepo.updateStatus(original.id, "delivered");
+        this.pushToRenderer("chat:onMessage", {
+          ...original,
+          status: "delivered",
+        });
+      }
+      return;
+    }
+
+    // Handle read receipt — update original messages to "read"
+    if (contentType === "read" && Array.isArray(raw.readIds)) {
+      const ids = raw.readIds as string[];
+      for (const id of ids) {
+        const original = this.messageRepo.findById(id);
+        if (
+          original &&
+          original.isOutbound &&
+          original.status !== "read" &&
+          original.status !== "failed"
+        ) {
+          this.messageRepo.updateStatus(original.id, "read");
+          this.pushToRenderer("chat:onMessage", {
+            ...original,
+            status: "read",
+          });
+        }
+      }
+      return;
+    }
+
+    // Skip non-displayable message types (ping, device:*, etc.)
     if (!DISPLAYABLE_TYPES.has(contentType)) {
       return;
     }
@@ -514,6 +552,19 @@ export class ChatService {
     // Check if sender's profile version changed (direct messages only)
     if (this.contactProfileService) {
       this.contactProfileService.checkAndRequestProfile(src, messageData);
+    }
+
+    // Send delivery receipt (fire-and-forget, direct 1-to-1 messages only)
+    try {
+      const receiptData: MessageData = {
+        id: crypto.randomUUID(),
+        contentType: "receipt",
+        targetID: messageData.id,
+        timestamp: Date.now(),
+      };
+      this.nknClient.sendMessageNoReply(src, JSON.stringify(receiptData));
+    } catch (err) {
+      console.error("Failed to send delivery receipt:", err);
     }
 
     // Handle inline audio (contentType "audio" with base64 content)
@@ -844,6 +895,34 @@ export class ChatService {
   markSessionRead(sessionId: string): void {
     this.sessionRepo.resetUnread(sessionId);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
+
+    // Send read receipts for direct 1-to-1 sessions only
+    if (!sessionId.startsWith("direct:")) return;
+
+    const targetAddress = sessionId.slice("direct:".length);
+    const unreadInbound = this.messageRepo.findInboundBySessionIdAndStatus(
+      sessionId,
+      "read",
+    );
+    if (unreadInbound.length === 0) return;
+
+    const readIds = unreadInbound.map((m) => m.id);
+    this.messageRepo.updateStatusBatch(readIds, "read");
+
+    try {
+      const readData: MessageData = {
+        id: crypto.randomUUID(),
+        contentType: "read",
+        readIds,
+        timestamp: Date.now(),
+      };
+      this.nknClient.sendMessageNoReply(
+        targetAddress,
+        JSON.stringify(readData),
+      );
+    } catch (err) {
+      console.error("Failed to send read receipt:", err);
+    }
   }
 
   private getOrCreateSession(

@@ -8,11 +8,12 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), Phase 4 NKN wallet, and Phase 5 security hardening are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, wallet support, and encrypted-at-rest storage: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile. The wallet seed never leaves the main process, the database is encrypted with SQLCipher, and safeStorage is required (no plaintext fallback).
+Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), Phase 4 NKN wallet, and Phase 5 security hardening are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, wallet support, message receipts, and encrypted-at-rest storage: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history and delivered/read status, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile. The wallet seed never leaves the main process, the database is encrypted with SQLCipher, and safeStorage is required (no plaintext fallback).
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
-- **1-to-1 messaging** — Send/receive text messages over NKN relay, with sending/sent/failed status tracking, legacy session consolidation (skips topic sessions) (`src/main/services/chat-service.ts`)
+- **1-to-1 messaging** — Send/receive text messages over NKN relay, with sending/sent/delivered/read status tracking, legacy session consolidation (skips topic sessions) (`src/main/services/chat-service.ts`)
+- **Message receipts** — Automatic delivery receipt (`contentType: "receipt"`) sent on message receive, read receipt (`contentType: "read"`) sent on conversation open, nMobile-compatible wire format, 1-to-1 only (no topic/group receipts) (`src/main/services/chat-service.ts`)
 - **Image messaging** — Send/receive encrypted images via IPFS, nMobile-compatible wire format (`src/main/services/chat-service.ts`)
 - **Voice messaging** — Record WebM/Opus via MediaRecorder, convert to AAC-ADTS via ffmpeg, send inline as base64 data-URI, nMobile-compatible (`src/main/services/audio-service.ts`)
 - **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, nMobile-compatible wire format with `fileType: 0`, open with system default app (`src/main/services/file-service.ts`)
@@ -36,7 +37,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group, user-profile-panel stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON or file), restore saved wallet (`src/renderer/pages/Login/`)
 - **User profile panel** — Unified modal for viewing any user's profile from message avatars, topic subscribers, private group members, or contacts. Shows avatar, display name, copyable NKN address, contextual badges (Contact, group permission). Actions: Send Message, Add Contact, Invite to Group (dropdown of joined groups where viewer is owner/admin), Remove from Group (owner only in group context). Self-view shows own profile + wallet address. Zustand store manages open/close globally. (`src/renderer/components/common/UserProfilePanel.tsx`, `src/renderer/stores/user-profile-panel-store.ts`)
-- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with clickable avatar/sender name (opens user profile panel) and surface-colored bubbles, three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
+- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with clickable avatar/sender name (opens user profile panel) and surface-colored bubbles, status icons (○ sending, ✓ sent, ✓✓ gray delivered, ✓✓ blue read, ✗ red failed), three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal with backdrop blur, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
@@ -63,7 +64,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - ~~Settings API allowlist~~ (done — renderer restricted to `ipfs_config`, `profile_*` keys)
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
-- Message receipts (delivered/read status)
+- ~~Message receipts~~ (done — delivery receipt on receive, read receipt on conversation open, blue ✓✓ for read)
 - Video sharing
 - Media messages in topics (video — images, audio, and file now supported)
 - Desktop notifications
@@ -312,7 +313,7 @@ Security: contextIsolation is enabled, nodeIntegration is disabled. The renderer
 5. **Message History** — Persist and display conversation threads
 
 ### Phase 2: Rich Messaging
-6. **Message Status** — Sending → Sent → Delivered → Read receipts
+6. **Message Status** — Sending → Sent → Delivered → Read receipts **Implemented.**
 7. **Media Messages** — Image, audio, video, file sharing
 8. **IPFS Integration** — Encrypted file upload/download for large media
 9. **Burn-after-read** — Self-destructing messages with configurable timers
@@ -480,7 +481,8 @@ Key conventions:
 - `image`, `audio`, `video`, `file` — Media (small, inline)
 - `ipfs` — Large file via IPFS (encrypted, with thumbnail)
 - `piece` — Erasure-coded fragment of a large payload
-- `receipt` — Delivery/read confirmation
+- `receipt` — Delivery confirmation (targetID = original message ID)
+- `read` — Read confirmation (readIds = array of message IDs)
 - `contact`, `contactOptions` — Profile sync
 - `deviceInfo`, `deviceRequest` — Multi-device coordination
 - `topic:subscribe`, `topic:unsubscribe` — Public group join/leave

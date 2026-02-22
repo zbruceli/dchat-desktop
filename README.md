@@ -36,7 +36,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Image viewer** — Click images to open full-screen lightbox, retry failed downloads
 - **Contact management** — Add contacts by NKN address, auto-create contacts for unknown senders
 - **Conversation threads** — Session list with last message preview and unread badges
-- **Message status** — Sending/sent/failed indicators on outbound messages
+- **Message receipts** — Delivered (gray ✓✓) and read (blue ✓✓) status on outbound messages, automatic delivery receipt on receive, read receipt on conversation open, nMobile-interoperable
 - **Encrypted local storage** — SQLCipher database (AES-256) keyed to wallet seed; wallet data stored in `wallet.json` with safeStorage encryption
 - **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
 - **Auth gate** — Login page when disconnected, full app when connected
@@ -51,7 +51,6 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - Hot-reload development environment
 
 ### Coming Soon
-- **Message receipts** — Delivered and read status tracking
 - **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
 - **Desktop notifications** — Native OS notifications for new messages

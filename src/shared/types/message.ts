@@ -21,7 +21,8 @@ export type MessageContentType =
   | "privateGroup:optionRequest"
   | "privateGroup:optionResponse"
   | "privateGroup:memberRequest"
-  | "privateGroup:memberResponse";
+  | "privateGroup:memberResponse"
+  | "read";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 
@@ -63,6 +64,8 @@ export interface MessageData {
   options?: MessageOptions;
   topic?: string;
   groupId?: string;
+  targetID?: string;
+  readIds?: string[];
   timestamp: number;
 }
 

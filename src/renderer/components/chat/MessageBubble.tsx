@@ -269,7 +269,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
       ? "\u25CB" // circle
       : message.status === "sent"
         ? "\u2713" // check
-        : message.status === "delivered"
+        : message.status === "delivered" || message.status === "read"
           ? "\u2713\u2713" // double check
           : message.status === "failed"
             ? "\u2717" // x
@@ -313,7 +313,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
       <div className="flex justify-end px-5 py-1">
         <div className="max-w-[70%]">
           <div className="flex items-baseline justify-end gap-2 mb-0.5">
-            <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
+            <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : message.status === "read" ? "text-blue-400" : "text-text-faint"}`}>
               {statusIcon}
             </span>
             <span className="text-[11px] text-text-muted">{time}</span>
