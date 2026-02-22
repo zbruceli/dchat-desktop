@@ -1,5 +1,6 @@
-import { ipcMain } from "electron";
+import { ipcMain, dialog } from "electron";
 import nkn from "nkn-sdk";
+import * as fs from "fs";
 import { IPC } from "../../shared/ipc-channels";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
@@ -161,6 +162,44 @@ export function registerWalletHandlers(
       const publicKey =
         dotIndex >= 0 ? clientAddress.slice(dotIndex + 1) : clientAddress;
       return nkn.Wallet.publicKeyToAddress(publicKey);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.WALLET.EXPORT_KEYSTORE,
+    async (): Promise<{ success: boolean; filePath?: string }> => {
+      const saved = walletStorage.load();
+      if (!saved) throw new Error("No saved wallet found");
+
+      const result = await dialog.showSaveDialog({
+        title: "Export Wallet Keystore",
+        defaultPath: "dchat-wallet-backup.json",
+        filters: [{ name: "NKN Keystore", extensions: ["json"] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false };
+      }
+
+      fs.writeFileSync(result.filePath, saved.keystore, "utf-8");
+      return { success: true, filePath: result.filePath };
+    },
+  );
+
+  ipcMain.handle(
+    IPC.WALLET.IMPORT_KEYSTORE_FILE,
+    async (): Promise<string | null> => {
+      const result = await dialog.showOpenDialog({
+        title: "Import Wallet Keystore",
+        filters: [{ name: "NKN Keystore", extensions: ["json"] }],
+        properties: ["openFile"],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      return fs.readFileSync(result.filePaths[0], "utf-8");
     },
   );
 }

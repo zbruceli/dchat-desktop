@@ -97,6 +97,144 @@ function ProfileSection() {
   );
 }
 
+function WalletBackupSection() {
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  async function handleExport() {
+    setStatus(null);
+    try {
+      const result = await window.dchat.wallet.exportKeystore();
+      if (result.success) {
+        setStatus({ type: "success", message: `Exported to ${result.filePath}` });
+        setTimeout(() => setStatus(null), 4000);
+      }
+    } catch (err) {
+      setStatus({ type: "error", message: err instanceof Error ? err.message : "Export failed" });
+    }
+  }
+
+  return (
+    <section className="max-w-lg mb-8">
+      <h2 className="text-sm font-medium text-text-secondary mb-4">Wallet Backup</h2>
+      <p className="text-xs text-text-muted mb-4">
+        Export your wallet keystore file for safekeeping. You can use it to restore your wallet
+        and recover all previous conversations on any device.
+      </p>
+
+      <button
+        onClick={handleExport}
+        className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        Export Wallet Keystore
+      </button>
+
+      {status && (
+        <p className={`mt-2 text-xs ${status.type === "success" ? "text-green-400" : "text-red-400"}`}>
+          {status.message}
+        </p>
+      )}
+
+      <p className="mt-3 text-[11px] text-text-faint">
+        Keep this file safe. Anyone with the keystore and password can access your wallet.
+      </p>
+    </section>
+  );
+}
+
+function DatabaseBackupSection() {
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleExport() {
+    if (!password.trim()) {
+      setStatus({ type: "error", message: "Enter your wallet password" });
+      return;
+    }
+    setStatus(null);
+    setLoading(true);
+    try {
+      const result = await window.dchat.database.export(password);
+      if (result.success) {
+        setStatus({ type: "success", message: `Exported to ${result.filePath}` });
+        setTimeout(() => setStatus(null), 4000);
+      }
+    } catch (err) {
+      setStatus({ type: "error", message: err instanceof Error ? err.message : "Export failed" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!password.trim()) {
+      setStatus({ type: "error", message: "Enter your wallet password" });
+      return;
+    }
+    const confirmed = window.confirm(
+      "Restoring will replace all current messages, contacts, and group data. The app will restart. Continue?",
+    );
+    if (!confirmed) return;
+
+    setStatus(null);
+    setLoading(true);
+    try {
+      await window.dchat.database.restore(password);
+    } catch (err) {
+      setStatus({ type: "error", message: err instanceof Error ? err.message : "Restore failed" });
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="max-w-lg mb-8">
+      <h2 className="text-sm font-medium text-text-secondary mb-4">Database Backup</h2>
+      <p className="text-xs text-text-muted mb-4">
+        Export or restore your message history, contacts, and group data. The backup is encrypted
+        with your wallet password.
+      </p>
+
+      <label className="block mb-4">
+        <span className="text-xs text-text-muted mb-1 block">Wallet Password</span>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your wallet password"
+          className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-sm text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
+        />
+      </label>
+
+      <div className="flex gap-3">
+        <button
+          onClick={handleExport}
+          disabled={loading}
+          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          {loading ? "Working..." : "Export Database"}
+        </button>
+        <button
+          onClick={handleRestore}
+          disabled={loading}
+          className="px-4 py-2 bg-surface-raised hover:bg-surface-border border border-surface-border text-text-primary rounded-lg text-sm font-medium transition-colors"
+        >
+          Restore Database
+        </button>
+      </div>
+
+      {status && (
+        <p className={`mt-2 text-xs ${status.type === "success" ? "text-green-400" : "text-red-400"}`}>
+          {status.message}
+        </p>
+      )}
+
+      <p className="mt-3 text-[11px] text-text-faint">
+        Warning: Restoring a backup will replace all current messages and contacts. The app will restart.
+      </p>
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const [gatewayHost, setGatewayHost] = useState("64.225.88.71");
   const [gatewayPort, setGatewayPort] = useState("80");
@@ -147,6 +285,10 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold text-text-primary mb-6">Settings</h1>
 
       <ProfileSection />
+
+      <WalletBackupSection />
+
+      <DatabaseBackupSection />
 
       <section className="max-w-lg">
         <h2 className="text-sm font-medium text-text-secondary mb-4">IPFS Configuration</h2>

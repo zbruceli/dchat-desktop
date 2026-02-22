@@ -102,14 +102,36 @@ export function LoginPage() {
           />
 
           {mode === "import" && (
-            <textarea
-              placeholder="Paste NKN keystore JSON..."
-              value={keystore}
-              onChange={(e) => setKeystore(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm resize-none font-mono"
-              disabled={loading}
-            />
+            <>
+              <div className="flex gap-2">
+                <textarea
+                  placeholder="Paste NKN keystore JSON..."
+                  value={keystore}
+                  onChange={(e) => setKeystore(e.target.value)}
+                  rows={4}
+                  className="flex-1 px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 text-sm resize-none font-mono"
+                  disabled={loading}
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      const content = await window.dchat.wallet.importKeystoreFile();
+                      if (content) setKeystore(content);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Failed to read file");
+                    }
+                  }}
+                  disabled={loading}
+                  className="self-start px-3 py-2 bg-surface-hover hover:bg-surface-border disabled:opacity-50 text-text-secondary rounded-lg text-xs transition-colors whitespace-nowrap"
+                  title="Import keystore from file"
+                >
+                  From File
+                </button>
+              </div>
+              <p className="text-[11px] text-text-faint">
+                Restoring a previously used wallet will recover all your conversations.
+              </p>
+            </>
           )}
 
           <div className="flex flex-col gap-2">

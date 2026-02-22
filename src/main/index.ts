@@ -260,6 +260,8 @@ app.whenReady().then(() => {
       topicService,
       profileService,
       privateGroupService,
+      walletStorage,
+      userDataPath,
     });
 
     servicesInitialized = true;

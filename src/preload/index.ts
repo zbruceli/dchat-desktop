@@ -109,6 +109,16 @@ const api = {
       ipcRenderer.invoke("wallet:transfer", toAddress, amount, fee),
     addressFromClient: (clientAddress: string): Promise<string> =>
       ipcRenderer.invoke("wallet:addressFromClient", clientAddress),
+    exportKeystore: (): Promise<{ success: boolean; filePath?: string }> =>
+      ipcRenderer.invoke("wallet:exportKeystore"),
+    importKeystoreFile: (): Promise<string | null> =>
+      ipcRenderer.invoke("wallet:importKeystoreFile"),
+  },
+  database: {
+    export: (password: string): Promise<{ success: boolean; filePath?: string }> =>
+      ipcRenderer.invoke("database:export", password),
+    restore: (password: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("database:restore", password),
   },
   session: {
     list: (): Promise<Session[]> =>

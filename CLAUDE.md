@@ -29,11 +29,12 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Ed25519 signature crypto** — Sign/verify with nkn-sdk + libsodium, SHA256→hex→Ed25519 signature chain, group version generation (MD5-based), nMobile-compatible (`src/main/crypto/ed25519-signature.ts`)
 - **Repository pattern** — MessageRepository, ContactRepository, SessionRepository, TopicRepository, TopicSubscriberRepository, PrivateGroupRepository, PrivateGroupMemberRepository with typed row mapping
 - **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page, profile exchange with nMobile contacts (`src/main/services/profile-service.ts`, `src/main/services/contact-profile-service.ts`)
-- **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process (`src/main/services/wallet-storage-service.ts`)
-- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group (`src/main/ipc/`)
+- **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process, keystore export/import via file dialogs (`src/main/services/wallet-storage-service.ts`)
+- **Database backup & restore** — Export SQLCipher DB as password-encrypted backup via `VACUUM INTO` + `PRAGMA rekey`, restore by rekeying backup to seed-derived key and replacing `dchat.db`, app relaunches after restore (`src/main/ipc/database-handlers.ts`)
+- **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group, database (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group, user-profile-panel stores with IPC subscription hooks (`src/renderer/stores/`)
-- **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
+- **Login page** — Create wallet, import wallet (keystore JSON or file), restore saved wallet (`src/renderer/pages/Login/`)
 - **User profile panel** — Unified modal for viewing any user's profile from message avatars, topic subscribers, private group members, or contacts. Shows avatar, display name, copyable NKN address, contextual badges (Contact, group permission). Actions: Send Message, Add Contact, Invite to Group (dropdown of joined groups where viewer is owner/admin), Remove from Group (owner only in group context). Self-view shows own profile + wallet address. Zustand store manages open/close globally. (`src/renderer/components/common/UserProfilePanel.tsx`, `src/renderer/stores/user-profile-panel-store.ts`)
 - **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with clickable avatar/sender name (opens user profile panel) and surface-colored bubbles, three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
@@ -43,7 +44,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list or profile nickname for self (falls back to truncated NKN address), member count display (auto-synced with subscriber list), subscriber side panel with refresh from blockchain and clickable rows (opens user profile panel), Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
 - **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with contact-picker invite/kick/refresh (member sync via `memberRequest`/`memberResponse` protocol), clickable member rows (opens user profile panel with group context), profile nickname for self in member list, member count auto-synced, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions, clickable avatar opens user profile panel (`src/renderer/pages/Contacts/`)
-- **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
+- **Settings UI** — Profile editing (avatar + nickname), wallet backup (keystore export), database backup & restore (password-encrypted), IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
 - **Error boundary** — React ErrorBoundary catches rendering crashes and displays error details with a retry button (`src/renderer/App.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
@@ -134,7 +135,8 @@ dchat/
 │   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages/sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-handlers.ts  # ✅ contact:add/list/get/delete
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
-│   │   │   ├── wallet-handlers.ts   # ✅ wallet:createAndConnect/importAndConnect/restoreAndConnect/autoConnect/logout/transfer/addressFromClient (seed never leaves main)
+│   │   │   ├── wallet-handlers.ts   # ✅ wallet:createAndConnect/importAndConnect/restoreAndConnect/autoConnect/logout/transfer/addressFromClient/exportKeystore/importKeystoreFile (seed never leaves main)
+│   │   │   ├── database-handlers.ts # ✅ database:export/restore (password-encrypted SQLCipher backup)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
 │   │   │   ├── private-group-handlers.ts # ✅ privateGroup:create/list/get/invite/accept/quit/kick/getMembers/refreshMembers/sendMessage/sendImage/sendAudio/sendFile
@@ -191,11 +193,11 @@ dchat/
 │   │   │   ├── profile-store.ts    # ✅ Profile state, load/setNickname/pickAndSetAvatar, push event updates
 │   │   │   └── user-profile-panel-store.ts # ✅ Global open/close state for UserProfilePanel modal
 │   │   ├── pages/
-│   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import/restore wallet + connect
+│   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import (paste or file)/restore wallet + connect
 │   │   │   ├── Chat/ChatPage.tsx    # ✅ Two-panel: session list + message thread
 │   │   │   ├── Contacts/ContactsPage.tsx # ✅ Contact list + add form
 │   │   │   ├── Wallet/WalletPage.tsx # ✅ Balance display, send NKN (with contact picker), receive addresses, echo test
-│   │   │   └── Settings/SettingsPage.tsx # ✅ Profile editing (avatar + nickname) + IPFS gateway configuration
+│   │   │   └── Settings/SettingsPage.tsx # ✅ Profile editing (avatar + nickname) + wallet backup + database backup/restore + IPFS gateway configuration
 │   │   ├── components/
 │   │   │   ├── chat/
 │   │   │   │   ├── SessionList.tsx  # ✅ Conversation list with previews + unread badges
@@ -231,7 +233,7 @@ dchat/
 │   │   │   ├── private-group.ts    # ✅ PrivateGroup, PrivateGroupMember, PrivateGroupItemPerm
 │   │   │   └── profile.ts          # ✅ Profile (nickname, avatarPath, profileVersion)
 │   │   ├── constants.ts             # ✅ App constants, NKN seed servers
-│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. TOPIC + PRIVATE_GROUP sections, session/topic/group delete events)
+│   │   └── ipc-channels.ts          # ✅ Typed IPC channels + push channels (incl. DATABASE, TOPIC + PRIVATE_GROUP sections, session/topic/group delete events)
 │   └── preload/
 │       └── index.ts                 # ✅ contextBridge API with typed returns + push listeners
 ├── tests/

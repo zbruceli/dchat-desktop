@@ -43,6 +43,8 @@ export const IPC = {
     GET_BALANCE: "wallet:getBalance",
     TRANSFER: "wallet:transfer",
     ADDRESS_FROM_CLIENT: "wallet:addressFromClient",
+    EXPORT_KEYSTORE: "wallet:exportKeystore",
+    IMPORT_KEYSTORE_FILE: "wallet:importKeystoreFile",
   },
   CLIENT_EXTRA: {
     ECHO_TEST: "client:echoTest",
@@ -79,6 +81,10 @@ export const IPC = {
     PICK_AVATAR: "profile:pickAvatar",
     SET_AVATAR: "profile:setAvatar",
     ON_UPDATE: "profile:onUpdate",
+  },
+  DATABASE: {
+    EXPORT: "database:export",
+    RESTORE: "database:restore",
   },
   PRIVATE_GROUP: {
     CREATE: "privateGroup:create",

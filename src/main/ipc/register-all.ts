@@ -7,6 +7,7 @@ import { registerSettingsHandlers } from "./settings-handlers";
 import { registerTopicHandlers } from "./topic-handlers";
 import { registerProfileHandlers } from "./profile-handlers";
 import { registerPrivateGroupHandlers } from "./private-group-handlers";
+import { registerDatabaseHandlers } from "./database-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
 import type { ChatService } from "../services/chat-service";
@@ -34,6 +35,8 @@ export interface PostDbHandlersParams {
   topicService?: TopicService;
   profileService: ProfileService;
   privateGroupService?: PrivateGroupService;
+  walletStorage: WalletStorageService;
+  userDataPath: string;
 }
 
 export function registerPostDbHandlers(params: PostDbHandlersParams): void {
@@ -48,4 +51,5 @@ export function registerPostDbHandlers(params: PostDbHandlersParams): void {
     registerPrivateGroupHandlers(params.privateGroupService);
   }
   registerProfileHandlers(params.profileService);
+  registerDatabaseHandlers(params.walletStorage, params.userDataPath);
 }
