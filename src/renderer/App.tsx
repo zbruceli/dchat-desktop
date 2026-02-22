@@ -8,6 +8,7 @@ import { ChatPage } from "./pages/Chat/ChatPage";
 import { ContactsPage } from "./pages/Contacts/ContactsPage";
 import { WalletPage } from "./pages/Wallet/WalletPage";
 import { SettingsPage } from "./pages/Settings/SettingsPage";
+import { UserProfilePanel } from "./components/common/UserProfilePanel";
 
 type NavItem = "chat" | "contacts" | "wallet" | "settings";
 
@@ -83,6 +84,7 @@ export function App() {
           <PageContent activeNav={activeNav} />
         </ErrorBoundary>
       </main>
+      <UserProfilePanel />
     </div>
   );
 }

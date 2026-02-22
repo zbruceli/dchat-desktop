@@ -89,6 +89,7 @@ export const IPC = {
     QUIT: "privateGroup:quit",
     KICK: "privateGroup:kick",
     GET_MEMBERS: "privateGroup:getMembers",
+    REFRESH_MEMBERS: "privateGroup:refreshMembers",
     SEND_MESSAGE: "privateGroup:sendMessage",
     SEND_IMAGE: "privateGroup:sendImage",
     SEND_AUDIO: "privateGroup:sendAudio",

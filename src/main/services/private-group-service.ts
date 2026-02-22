@@ -1380,7 +1380,49 @@ export class PrivateGroupService {
   }
 
   getMembers(groupId: string): PrivateGroupMember[] {
-    return this.memberRepo.findByGroupId(groupId);
+    const members = this.memberRepo.findByGroupId(groupId);
+
+    // Sync count if it drifted from active member list
+    const activeCount = members.filter(
+      (m) => m.permission > PrivateGroupItemPerm.NONE,
+    ).length;
+    const group = this.groupRepo.findById(groupId);
+    if (group && group.count !== activeCount) {
+      this.groupRepo.setCount(groupId, activeCount);
+      const updated = this.groupRepo.findById(groupId);
+      if (updated) this.pushToRenderer("privateGroup:onUpdate", updated);
+    }
+
+    return members;
+  }
+
+  /** Request member list from group owner/inviter (non-owner) or broadcast to all (owner) */
+  async requestMemberSync(groupId: string): Promise<void> {
+    const myAddress = this.nknClient.getAddress();
+    if (!myAddress) throw new Error("Not connected");
+
+    const myMember = this.memberRepo.findByGroupIdAndInvitee(groupId, myAddress);
+    if (!myMember || myMember.permission <= PrivateGroupItemPerm.NONE) {
+      throw new Error("Not a member of this group");
+    }
+
+    if (myMember.permission === PrivateGroupItemPerm.OWNER) {
+      // Owner: broadcast full member list to all members
+      await this.syncMembersToAll(groupId);
+    } else {
+      // Non-owner: request from inviter
+      const group = this.groupRepo.findById(groupId);
+      const memberRequestData = {
+        id: crypto.randomUUID(),
+        contentType: "privateGroup:memberRequest",
+        content: { groupId, version: group?.version ?? "" },
+        timestamp: Date.now(),
+      };
+      this.nknClient.sendMessageNoReply(
+        myMember.inviter,
+        JSON.stringify(memberRequestData),
+      );
+    }
   }
 
   // ─── Helpers ────────────────────────────────────────────

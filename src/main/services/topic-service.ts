@@ -167,7 +167,17 @@ export class TopicService {
   }
 
   getSubscribers(topicName: string): TopicSubscriber[] {
-    return this.subscriberRepo.findByTopicId(topicName);
+    const subs = this.subscriberRepo.findByTopicId(topicName);
+
+    // Sync memberCount if it drifted from the cached subscriber list
+    const topic = this.topicRepo.findById(topicName);
+    if (topic && topic.memberCount !== subs.length) {
+      this.topicRepo.setMemberCount(topicName, subs.length);
+      const updated = this.topicRepo.findById(topicName);
+      if (updated) this.pushToRenderer("topic:onUpdate", updated);
+    }
+
+    return subs;
   }
 
   private getSubscriberAddresses(topicName: string): string[] {

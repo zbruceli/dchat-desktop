@@ -3,6 +3,8 @@ import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
+import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
+import { truncateAddress, stringToColor } from "../../utils/address";
 import { ImageModal } from "./ImageModal";
 import { AudioContent } from "./AudioContent";
 import { FileContent } from "./FileContent";
@@ -233,25 +235,6 @@ function ControlMessageContent({ message }: { message: Message }) {
   );
 }
 
-/** Truncate an NKN address for display */
-function truncateAddress(addr: string): string {
-  if (addr.length <= 16) return addr;
-  return addr.substring(0, 8) + "..." + addr.substring(addr.length - 6);
-}
-
-/** Generate a consistent color from a string (for avatar backgrounds) */
-function stringToColor(str: string): string {
-  const colors = [
-    "bg-blue-700", "bg-emerald-700", "bg-purple-700", "bg-amber-700",
-    "bg-rose-700", "bg-cyan-700", "bg-indigo-700", "bg-teal-700",
-  ];
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
   const contacts = useContactStore((s) => s.contacts);
@@ -343,17 +326,27 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     );
   }
 
+  const openProfile = useUserProfilePanelStore((s) => s.open);
+
   // Inbound messages: left-aligned with avatar
   return (
     <div className="flex justify-start px-5 py-1">
       <div className="flex items-start gap-3 max-w-[70%]">
-        <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
+        <div
+          className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 cursor-pointer hover:opacity-80 ${avatarColor}`}
+          onClick={() => openProfile(message.sender)}
+        >
           <span className="text-sm text-white font-medium">{avatarInitial}</span>
         </div>
         <div className="min-w-0">
           <div className="flex items-baseline gap-2 mb-0.5">
             {showSender && (
-              <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
+              <span
+                className="text-[13px] font-semibold text-text-primary cursor-pointer hover:underline"
+                onClick={() => openProfile(message.sender)}
+              >
+                {senderName}
+              </span>
             )}
             <span className="text-[11px] text-text-muted">{time}</span>
           </div>

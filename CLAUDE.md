@@ -32,20 +32,23 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process (`src/main/services/wallet-storage-service.ts`)
 - **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
-- **Zustand stores** — Client, chat, contact, session, topic, profile, private group stores with IPC subscription hooks (`src/renderer/stores/`)
+- **Zustand stores** — Client, chat, contact, session, topic, profile, private group, user-profile-panel stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
-- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with avatar and surface-colored bubbles, three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
+- **User profile panel** — Unified modal for viewing any user's profile from message avatars, topic subscribers, private group members, or contacts. Shows avatar, display name, copyable NKN address, contextual badges (Contact, group permission). Actions: Send Message, Add Contact, Invite to Group (dropdown of joined groups where viewer is owner/admin), Remove from Group (owner only in group context). Self-view shows own profile + wallet address. Zustand store manages open/close globally. (`src/renderer/components/common/UserProfilePanel.tsx`, `src/renderer/stores/user-profile-panel-store.ts`)
+- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with clickable avatar/sender name (opens user profile panel) and surface-colored bubbles, three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal with backdrop blur, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
-- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
-- **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with contact-picker invite/kick, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
-- **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
+- **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list or profile nickname for self (falls back to truncated NKN address), member count display (auto-synced with subscriber list), subscriber side panel with refresh from blockchain and clickable rows (opens user profile panel), Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
+- **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with contact-picker invite/kick/refresh (member sync via `memberRequest`/`memberResponse` protocol), clickable member rows (opens user profile panel with group context), profile nickname for self in member list, member count auto-synced, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
+- **Contacts UI** — Contact list with add form, chat and delete actions, clickable avatar opens user profile panel (`src/renderer/pages/Contacts/`)
 - **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
 - **Error boundary** — React ErrorBoundary catches rendering crashes and displays error details with a retry button (`src/renderer/App.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
+- **Reusable components** — `CopyableField` (label + value + copy button), `UserProfilePanel` (modal user profile viewer) (`src/renderer/components/common/`)
+- **Shared utilities** — `truncateAddress()` and `stringToColor()` extracted into `src/renderer/utils/address.ts`
 - **Connection status** — Avatar with rounded-lg shape, green/yellow/red status dot overlay, nickname display, inline profile editing popover (`src/renderer/components/common/ConnectionStatus.tsx`)
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
@@ -134,7 +137,7 @@ dchat/
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:createAndConnect/importAndConnect/restoreAndConnect/autoConnect/logout/transfer/addressFromClient (seed never leaves main)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
-│   │   │   ├── private-group-handlers.ts # ✅ privateGroup:create/list/get/invite/accept/quit/kick/getMembers/sendMessage/sendImage/sendAudio/sendFile
+│   │   │   ├── private-group-handlers.ts # ✅ privateGroup:create/list/get/invite/accept/quit/kick/getMembers/refreshMembers/sendMessage/sendImage/sendAudio/sendFile
 │   │   │   └── profile-handlers.ts # ✅ profile:get/setNickname/pickAvatar/setAvatar
 │   │   ├── services/                # Business logic (mirrors nMobile common/)
 │   │   │   ├── nkn-client-service.ts # ✅ NKN MultiClient wrapper, connect/send/sendNoReply/subscribe/unsubscribe/getSubscribers/sendToMultiple
@@ -185,7 +188,8 @@ dchat/
 │   │   │   ├── topic-store.ts       # ✅ Topic list, create/join/leave, subscriber fetch, real-time updates
 │   │   │   ├── private-group-store.ts # ✅ Private group list, create/invite/accept/quit/kick, member fetch, real-time updates
 │   │   │   ├── nav-store.ts        # ✅ Active navigation tab state
-│   │   │   └── profile-store.ts    # ✅ Profile state, load/setNickname/pickAndSetAvatar, push event updates
+│   │   │   ├── profile-store.ts    # ✅ Profile state, load/setNickname/pickAndSetAvatar, push event updates
+│   │   │   └── user-profile-panel-store.ts # ✅ Global open/close state for UserProfilePanel modal
 │   │   ├── pages/
 │   │   │   ├── Login/LoginPage.tsx  # ✅ Create/import/restore wallet + connect
 │   │   │   ├── Chat/ChatPage.tsx    # ✅ Two-panel: session list + message thread
@@ -202,9 +206,15 @@ dchat/
 │   │   │   │   ├── AudioContent.tsx # ✅ Audio player (play/pause, progress bar, duration)
 │   │   │   │   ├── VoiceRecordButton.tsx # ✅ Click-to-record mic button (0.5s–60s, cancel, send)
 │   │   │   │   ├── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
-│   │   │   │   └── PrivateGroupMemberPanel.tsx # ✅ Member list with contact-picker invite, kick, permission badges, leave button
-│   │   │   └── common/
-│   │   │       └── ConnectionStatus.tsx # ✅ Avatar circle + status dot overlay + nickname + profile editing popover
+│   │   │   │   └── PrivateGroupMemberPanel.tsx # ✅ Member list with contact-picker invite, kick, refresh, permission badges, clickable rows
+│   │   │   ├── common/
+│   │   │   │   ├── ConnectionStatus.tsx # ✅ Avatar circle + status dot overlay + nickname + profile editing popover
+│   │   │   │   ├── CopyableField.tsx  # ✅ Reusable label + value + copy-to-clipboard component
+│   │   │   │   └── UserProfilePanel.tsx # ✅ Modal user profile: avatar, name, addresses, Send Message/Add Contact/Invite/Remove actions
+│   │   │   └── contact/
+│   │   │       └── ContactEditPanel.tsx # ✅ Contact detail side panel with name editing, avatar, chat + delete actions
+│   │   ├── utils/
+│   │   │   └── address.ts           # ✅ truncateAddress(), stringToColor() shared utilities
 │   │   ├── hooks/
 │   │   │   └── use-ipc-subscriptions.ts # ✅ Push-event subscriptions on mount
 │   │   └── styles/

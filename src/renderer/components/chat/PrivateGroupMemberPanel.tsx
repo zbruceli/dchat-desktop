@@ -4,11 +4,9 @@ import { PrivateGroupItemPerm } from "../../../shared/types";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
 import { useContactStore } from "../../stores/contact-store";
 import { useClientStore } from "../../stores/client-store";
-
-function truncateAddr(addr: string): string {
-  if (addr.length <= 20) return addr;
-  return addr.substring(0, 10) + "..." + addr.substring(addr.length - 8);
-}
+import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
+import { useProfileStore } from "../../stores/profile-store";
+import { truncateAddress } from "../../utils/address";
 
 function permLabel(perm: number): string {
   if (perm === PrivateGroupItemPerm.OWNER) return "Owner";
@@ -132,10 +130,10 @@ function InviteSection({
                     {c.name && !c.name.endsWith("...") ? (
                       <>
                         <span className="text-[10px] text-text-primary block truncate">{c.name}</span>
-                        <span className="text-[9px] text-text-faint block truncate font-mono">{truncateAddr(c.address)}</span>
+                        <span className="text-[9px] text-text-faint block truncate font-mono">{truncateAddress(c.address)}</span>
                       </>
                     ) : (
-                      <span className="text-[10px] text-text-primary block truncate font-mono">{truncateAddr(c.address)}</span>
+                      <span className="text-[10px] text-text-primary block truncate font-mono">{truncateAddress(c.address)}</span>
                     )}
                   </div>
                 </button>
@@ -147,7 +145,7 @@ function InviteSection({
                 disabled={inviting}
               >
                 <span className="text-[10px] text-text-secondary">Invite: </span>
-                <span className="text-[10px] text-text-primary font-mono">{truncateAddr(search.trim())}</span>
+                <span className="text-[10px] text-text-primary font-mono">{truncateAddress(search.trim())}</span>
               </button>
             ) : (
               <div className="px-2 py-2 text-center">
@@ -173,10 +171,14 @@ export function PrivateGroupMemberPanel({
   const [members, setMembers] = useState<PrivateGroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const contacts = useContactStore((s) => s.contacts);
+  const groups = usePrivateGroupStore((s) => s.groups);
   const inviteMember = usePrivateGroupStore((s) => s.inviteMember);
   const kickMember = usePrivateGroupStore((s) => s.kickMember);
   const myAddress = useClientStore((s) => s.status?.address);
+  const myNickname = useProfileStore((s) => s.profile?.nickname);
+  const openProfile = useUserProfilePanelStore((s) => s.open);
 
   useEffect(() => {
     loadMembers();
@@ -208,12 +210,30 @@ export function PrivateGroupMemberPanel({
     }
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await window.dchat.privateGroup.refreshMembers(groupId);
+      // Wait briefly for memberResponse to arrive and be processed
+      await new Promise((r) => setTimeout(r, 2000));
+      const m = await window.dchat.privateGroup.getMembers(groupId);
+      setMembers(m);
+    } catch (err) {
+      console.error("Failed to refresh members:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function getDisplayName(address: string): string {
+    if (address === myAddress && myNickname) {
+      return myNickname;
+    }
     const contact = contacts.find((c) => c.address === address);
     if (contact && contact.name && !contact.name.endsWith("...")) {
       return contact.name;
     }
-    return truncateAddr(address);
+    return truncateAddress(address);
   }
 
   return (
@@ -222,15 +242,37 @@ export function PrivateGroupMemberPanel({
         <span className="text-xs font-semibold text-text-secondary">
           Members ({activeMembers.length})
         </span>
-        <button
-          onClick={onClose}
-          className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
-          title="Close"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors disabled:opacity-40"
+            title="Refresh member list"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={onClose}
+            className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
+            title="Close"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Invite section (owner/admin only) */}
@@ -265,10 +307,18 @@ export function PrivateGroupMemberPanel({
           </div>
         ) : (
           <div className="py-1">
-            {activeMembers.map((member) => (
+            {activeMembers.map((member) => {
+              const group = groups.find((g) => g.groupId === groupId);
+              return (
               <div
                 key={member.invitee}
-                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50 group"
+                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50 group cursor-pointer"
+                onClick={() => openProfile(member.invitee, {
+                  groupId,
+                  groupName: group?.name,
+                  viewerPermission: myMember?.permission,
+                  targetPermission: member.permission,
+                })}
               >
                 <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
                   <span className="text-[9px] text-text-secondary">
@@ -285,7 +335,7 @@ export function PrivateGroupMemberPanel({
                 </div>
                 {isOwner && member.invitee !== myAddress && member.permission < PrivateGroupItemPerm.OWNER && (
                   <button
-                    onClick={() => handleKick(member.invitee)}
+                    onClick={(e) => { e.stopPropagation(); handleKick(member.invitee); }}
                     className="opacity-0 group-hover:opacity-100 text-[9px] text-red-400 hover:text-red-300 transition-opacity"
                     title="Remove member"
                   >
@@ -293,7 +343,8 @@ export function PrivateGroupMemberPanel({
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

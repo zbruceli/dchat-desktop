@@ -205,6 +205,8 @@ const api = {
       ipcRenderer.invoke("privateGroup:kick", groupId, targetAddress),
     getMembers: (groupId: string): Promise<PrivateGroupMember[]> =>
       ipcRenderer.invoke("privateGroup:getMembers", groupId),
+    refreshMembers: (groupId: string): Promise<void> =>
+      ipcRenderer.invoke("privateGroup:refreshMembers", groupId),
     sendMessage: (groupId: string, content: string, contentType?: string): Promise<Message> =>
       ipcRenderer.invoke("privateGroup:sendMessage", groupId, content, contentType),
     sendImage: (groupId: string, filePath: string): Promise<Message> =>

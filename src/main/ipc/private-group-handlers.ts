@@ -35,6 +35,10 @@ export function registerPrivateGroupHandlers(privateGroupService: PrivateGroupSe
     return privateGroupService.getMembers(groupId);
   });
 
+  ipcMain.handle(IPC.PRIVATE_GROUP.REFRESH_MEMBERS, (_event, groupId: string) => {
+    return privateGroupService.requestMemberSync(groupId);
+  });
+
   ipcMain.handle(
     IPC.PRIVATE_GROUP.SEND_MESSAGE,
     (_event, groupId: string, content: string, contentType?: string) => {

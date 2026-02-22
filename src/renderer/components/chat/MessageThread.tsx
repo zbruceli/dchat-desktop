@@ -4,16 +4,14 @@ import { useSessionStore } from "../../stores/session-store";
 import { useTopicStore } from "../../stores/topic-store";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
 import { useContactStore } from "../../stores/contact-store";
+import { useClientStore } from "../../stores/client-store";
+import { useProfileStore } from "../../stores/profile-store";
+import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
+import { truncateAddress } from "../../utils/address";
 import type { TopicSubscriber } from "../../../shared/types";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
-
-/** Truncate an NKN address for display */
-function truncateAddr(addr: string): string {
-  if (addr.length <= 20) return addr;
-  return addr.substring(0, 10) + "..." + addr.substring(addr.length - 8);
-}
 
 function SubscriberPanel({
   topicName,
@@ -26,6 +24,9 @@ function SubscriberPanel({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const contacts = useContactStore((s) => s.contacts);
+  const myAddress = useClientStore((s) => s.status?.address);
+  const myNickname = useProfileStore((s) => s.profile?.nickname);
+  const openProfile = useUserProfilePanelStore((s) => s.open);
 
   useEffect(() => {
     loadSubscribers();
@@ -57,11 +58,14 @@ function SubscriberPanel({
   }
 
   function getDisplayName(address: string): string {
+    if (address === myAddress && myNickname) {
+      return myNickname;
+    }
     const contact = contacts.find((c) => c.address === address);
     if (contact && contact.name && !contact.name.endsWith("...")) {
       return contact.name;
     }
-    return truncateAddr(address);
+    return truncateAddress(address, 10, 8);
   }
 
   return (
@@ -116,7 +120,8 @@ function SubscriberPanel({
             {subscribers.map((sub) => (
               <div
                 key={sub.contactAddress}
-                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50"
+                className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50 cursor-pointer"
+                onClick={() => openProfile(sub.contactAddress, { topicName })}
               >
                 <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
                   <span className="text-[9px] text-text-secondary">

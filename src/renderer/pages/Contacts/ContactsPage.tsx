@@ -5,6 +5,7 @@ import { useChatStore } from "../../stores/chat-store";
 import { useNavStore } from "../../stores/nav-store";
 import { useSessionStore } from "../../stores/session-store";
 import { ContactEditPanel } from "../../components/contact/ContactEditPanel";
+import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
 
 export function ContactsPage() {
   const contacts = useContactStore((s) => s.contacts);
@@ -18,6 +19,8 @@ export function ContactsPage() {
   const startSession = useChatStore((s) => s.startSession);
   const setActiveNav = useNavStore((s) => s.setActiveNav);
   const loadSessions = useSessionStore((s) => s.loadSessions);
+
+  const openProfile = useUserProfilePanelStore((s) => s.open);
 
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -170,7 +173,10 @@ export function ContactsPage() {
                         : "hover:bg-surface-hover/50 border-l-2 border-transparent"
                     }`}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <div
+                      className="w-9 h-9 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80"
+                      onClick={(e) => { e.stopPropagation(); openProfile(contact.address); }}
+                    >
                       {avatarUrl ? (
                         <img
                           src={avatarUrl}
