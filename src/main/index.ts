@@ -115,13 +115,21 @@ app.whenReady().then(() => {
   protocol.handle("dchat-media", async (request) => {
     const url = new URL(request.url);
     const filePath = path.join(userDataPath, url.hostname, url.pathname);
+
+    // Prevent path traversal — resolved path must stay within userDataPath
+    const resolvedPath = path.resolve(filePath);
+    const resolvedBase = path.resolve(userDataPath);
+    if (!resolvedPath.startsWith(resolvedBase + path.sep)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
     const ext = path.extname(filePath).toLowerCase();
     const mimeType = MIME_TYPES[ext];
 
     if (mimeType) {
       const fs = await import("fs");
       try {
-        const data = fs.readFileSync(filePath);
+        const data = fs.readFileSync(resolvedPath);
         return new Response(data, {
           headers: { "Content-Type": mimeType },
         });
@@ -130,7 +138,7 @@ app.whenReady().then(() => {
       }
     }
 
-    return net.fetch(pathToFileURL(filePath).href);
+    return net.fetch(pathToFileURL(resolvedPath).href);
   });
 
   // 1. Create window

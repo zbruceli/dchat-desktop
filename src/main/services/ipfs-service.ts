@@ -86,12 +86,44 @@ export class IpfsService {
     return this.gateways[0]?.host ?? "64.225.88.71";
   }
 
+  /**
+   * Check if an IP address is in a private/reserved range (RFC 1918, loopback, link-local).
+   * Rejects addresses that could be used for SSRF against internal networks.
+   */
+  private isPrivateOrReservedIp(ip: string): boolean {
+    // Basic IPv4 validation
+    const parts = ip.split(".");
+    if (parts.length !== 4) return true; // Not valid IPv4 — reject
+    const octets = parts.map(Number);
+    if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) return true;
+
+    const [a, b] = octets;
+    // 10.0.0.0/8
+    if (a === 10) return true;
+    // 172.16.0.0/12
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    // 192.168.0.0/16
+    if (a === 192 && b === 168) return true;
+    // 127.0.0.0/8 (loopback)
+    if (a === 127) return true;
+    // 169.254.0.0/16 (link-local)
+    if (a === 169 && b === 254) return true;
+    // 0.0.0.0
+    if (a === 0) return true;
+
+    return false;
+  }
+
   private orderGateways(preferredIp?: string): IpfsGateway[] {
     if (!preferredIp) return this.gateways;
     const preferred = this.gateways.filter((g) => g.host === preferredIp);
     const rest = this.gateways.filter((g) => g.host !== preferredIp);
     if (preferred.length === 0) {
-      // Add the preferred IP as an ad-hoc gateway (nMobile convention)
+      // Only add ad-hoc gateways from message options if they are public IPs
+      if (this.isPrivateOrReservedIp(preferredIp)) {
+        console.warn(`[IpfsService] Rejected private/reserved gateway IP: ${preferredIp}`);
+        return this.gateways;
+      }
       return [
         { host: preferredIp, port: 80, protocol: "http:" },
         ...this.gateways,
