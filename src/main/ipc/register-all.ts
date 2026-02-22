@@ -8,6 +8,7 @@ import { registerTopicHandlers } from "./topic-handlers";
 import { registerProfileHandlers } from "./profile-handlers";
 import { registerPrivateGroupHandlers } from "./private-group-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
+import type { WalletStorageService } from "../services/wallet-storage-service";
 import type { ChatService } from "../services/chat-service";
 import type { ContactService } from "../services/contact-service";
 import type { SessionService } from "../services/session-service";
@@ -16,8 +17,16 @@ import type { TopicService } from "../services/topic-service";
 import type { ProfileService } from "../services/profile-service";
 import type { PrivateGroupService } from "../services/private-group-service";
 
-export interface RegisterHandlersParams {
-  nknClient: NknClientService;
+export function registerPreDbHandlers(
+  nknClient: NknClientService,
+  walletStorage: WalletStorageService,
+  initServices: (seed: string) => void,
+): void {
+  registerClientHandlers(nknClient);
+  registerWalletHandlers(nknClient, walletStorage, initServices);
+}
+
+export interface PostDbHandlersParams {
   chatService: ChatService;
   contactService: ContactService;
   sessionService: SessionService;
@@ -27,12 +36,10 @@ export interface RegisterHandlersParams {
   privateGroupService?: PrivateGroupService;
 }
 
-export function registerAllHandlers(params: RegisterHandlersParams): void {
-  registerClientHandlers(params.nknClient);
+export function registerPostDbHandlers(params: PostDbHandlersParams): void {
   registerChatHandlers(params.chatService);
   registerContactHandlers(params.contactService);
   registerSessionHandlers(params.sessionService, params.chatService);
-  registerWalletHandlers();
   registerSettingsHandlers(params.ipfsService);
   if (params.topicService) {
     registerTopicHandlers(params.topicService);

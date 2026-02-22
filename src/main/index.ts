@@ -1,11 +1,14 @@
 import { app, BrowserWindow, ipcMain, protocol, net, shell } from "electron";
+import crypto from "crypto";
 import path from "path";
 import { pathToFileURL } from "url";
 import { initDatabase, closeDatabase } from "./db/database";
+import { migrateToEncrypted } from "./db/migrate-to-encrypted";
 import { MessageRepository } from "./db/repositories/message-repository";
 import { ContactRepository } from "./db/repositories/contact-repository";
 import { SessionRepository } from "./db/repositories/session-repository";
 import { NknClientService } from "./services/nkn-client-service";
+import { WalletStorageService } from "./services/wallet-storage-service";
 import { ChatService } from "./services/chat-service";
 import { ContactService } from "./services/contact-service";
 import { SessionService } from "./services/session-service";
@@ -21,7 +24,10 @@ import { TopicRepository } from "./db/repositories/topic-repository";
 import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
 import { PrivateGroupRepository } from "./db/repositories/private-group-repository";
 import { PrivateGroupMemberRepository } from "./db/repositories/private-group-member-repository";
-import { registerAllHandlers } from "./ipc/register-all";
+import {
+  registerPreDbHandlers,
+  registerPostDbHandlers,
+} from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
 let mainWindow: BrowserWindow | null = null;
@@ -80,37 +86,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(() => {
-  // 1. Initialize database
   const userDataPath = app.getPath("userData");
-  const db = initDatabase(userDataPath);
-
-  // 2. Create repositories
-  const messageRepo = new MessageRepository(db);
-  const contactRepo = new ContactRepository(db);
-  const sessionRepo = new SessionRepository(db);
-  const topicRepo = new TopicRepository(db);
-  const subscriberRepo = new TopicSubscriberRepository(db);
-  const privateGroupRepo = new PrivateGroupRepository(db);
-  const privateGroupMemberRepo = new PrivateGroupMemberRepository(db);
-
-  // 3. Create IPFS + Image services
-  const ipfsService = new IpfsService();
-  const imageService = new ImageService(ipfsService, userDataPath);
-
-  // Load IPFS config from settings (if user customized gateways)
-  const settingsRow = db
-    .prepare("SELECT value FROM settings WHERE key = ?")
-    .get("ipfs_config") as { value: string } | undefined;
-  if (settingsRow?.value) {
-    try {
-      const config = JSON.parse(settingsRow.value);
-      if (config.gateways) {
-        ipfsService.setConfig(config);
-      }
-    } catch {
-      // ignore invalid config — defaults to nMobile gateway
-    }
-  }
 
   // MIME type map for media files served via dchat-media://
   const MIME_TYPES: Record<string, string> = {
@@ -127,23 +103,22 @@ app.whenReady().then(() => {
     ".pdf": "application/pdf",
     ".zip": "application/zip",
     ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xlsx":
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".txt": "text/plain",
   };
 
   // Register dchat-media:// protocol handler
   protocol.handle("dchat-media", async (request) => {
     const url = new URL(request.url);
-    // dchat-media://image-cache/filename → {userData}/image-cache/filename
-    // dchat-media://audio-cache/filename → {userData}/audio-cache/filename
     const filePath = path.join(userDataPath, url.hostname, url.pathname);
     const ext = path.extname(filePath).toLowerCase();
     const mimeType = MIME_TYPES[ext];
 
     if (mimeType) {
-      // Read file and return with explicit Content-Type for reliable playback
       const fs = await import("fs");
       try {
         const data = fs.readFileSync(filePath);
@@ -155,79 +130,136 @@ app.whenReady().then(() => {
       }
     }
 
-    // Fallback for unknown types
     return net.fetch(pathToFileURL(filePath).href);
   });
 
-  // 4. Create window
+  // 1. Create window
   createWindow();
 
-  // 5. Create NKN client service with push callbacks
+  // 2. Create NKN client service + wallet storage (no DB needed)
   const nknClient = new NknClientService();
   nknClient.on("statusChange", (status) => {
     pushToRenderer(IPC.CLIENT.ON_STATUS_CHANGE, status);
   });
 
-  // 6. Create services
-  const chatService = new ChatService(
-    nknClient,
-    messageRepo,
-    sessionRepo,
-    contactRepo,
-    pushToRenderer,
-  );
-  const audioService = new AudioService(ipfsService, userDataPath);
-  const fileService = new FileService(ipfsService, userDataPath);
-  chatService.setImageService(imageService);
-  chatService.setAudioService(audioService);
-  chatService.setFileService(fileService);
+  const walletStorage = new WalletStorageService(userDataPath);
 
-  const topicService = new TopicService(
-    nknClient,
-    topicRepo,
-    subscriberRepo,
-    messageRepo,
-    sessionRepo,
-    contactRepo,
-    pushToRenderer,
-  );
-  topicService.setImageService(imageService);
-  topicService.setAudioService(audioService);
-  topicService.setFileService(fileService);
-  chatService.setTopicService(topicService);
+  // Track whether services have been initialized
+  let servicesInitialized = false;
 
-  const privateGroupService = new PrivateGroupService(
-    nknClient,
-    privateGroupRepo,
-    privateGroupMemberRepo,
-    messageRepo,
-    sessionRepo,
-    contactRepo,
-    pushToRenderer,
-  );
-  privateGroupService.setImageService(imageService);
-  privateGroupService.setAudioService(audioService);
-  privateGroupService.setFileService(fileService);
-  chatService.setPrivateGroupService(privateGroupService);
+  // 3. Define initServices callback (called after wallet is loaded)
+  function initServices(seed: string): void {
+    if (servicesInitialized) return;
 
-  const contactService = new ContactService(contactRepo, userDataPath);
-  const sessionService = new SessionService(sessionRepo);
-  const profileService = new ProfileService(db, userDataPath, pushToRenderer);
+    const dbKey = crypto.createHash("sha256").update(seed, "hex").digest("hex");
 
-  const contactProfileService = new ContactProfileService(
-    nknClient,
-    profileService,
-    contactRepo,
-    sessionRepo,
-    pushToRenderer,
-    userDataPath,
-  );
-  chatService.setContactProfileService(contactProfileService);
+    // Migrate existing unencrypted DB if needed
+    migrateToEncrypted(userDataPath, dbKey);
 
-  // 7. Register IPC handlers
-  registerAllHandlers({ nknClient, chatService, contactService, sessionService, ipfsService, topicService, profileService, privateGroupService });
+    // Initialize encrypted database
+    const db = initDatabase(userDataPath, dbKey);
 
-  // App info handler
+    // Create repositories
+    const messageRepo = new MessageRepository(db);
+    const contactRepo = new ContactRepository(db);
+    const sessionRepo = new SessionRepository(db);
+    const topicRepo = new TopicRepository(db);
+    const subscriberRepo = new TopicSubscriberRepository(db);
+    const privateGroupRepo = new PrivateGroupRepository(db);
+    const privateGroupMemberRepo = new PrivateGroupMemberRepository(db);
+
+    // Create IPFS + media services
+    const ipfsService = new IpfsService();
+    const imageService = new ImageService(ipfsService, userDataPath);
+
+    // Load IPFS config from settings
+    const settingsRow = db
+      .prepare("SELECT value FROM settings WHERE key = ?")
+      .get("ipfs_config") as { value: string } | undefined;
+    if (settingsRow?.value) {
+      try {
+        const config = JSON.parse(settingsRow.value);
+        if (config.gateways) {
+          ipfsService.setConfig(config);
+        }
+      } catch {
+        // ignore invalid config
+      }
+    }
+
+    // Create services
+    const chatService = new ChatService(
+      nknClient,
+      messageRepo,
+      sessionRepo,
+      contactRepo,
+      pushToRenderer,
+    );
+    const audioService = new AudioService(ipfsService, userDataPath);
+    const fileService = new FileService(ipfsService, userDataPath);
+    chatService.setImageService(imageService);
+    chatService.setAudioService(audioService);
+    chatService.setFileService(fileService);
+
+    const topicService = new TopicService(
+      nknClient,
+      topicRepo,
+      subscriberRepo,
+      messageRepo,
+      sessionRepo,
+      contactRepo,
+      pushToRenderer,
+    );
+    topicService.setImageService(imageService);
+    topicService.setAudioService(audioService);
+    topicService.setFileService(fileService);
+    chatService.setTopicService(topicService);
+
+    const privateGroupService = new PrivateGroupService(
+      nknClient,
+      privateGroupRepo,
+      privateGroupMemberRepo,
+      messageRepo,
+      sessionRepo,
+      contactRepo,
+      pushToRenderer,
+    );
+    privateGroupService.setImageService(imageService);
+    privateGroupService.setAudioService(audioService);
+    privateGroupService.setFileService(fileService);
+    chatService.setPrivateGroupService(privateGroupService);
+
+    const contactService = new ContactService(contactRepo, userDataPath);
+    const sessionService = new SessionService(sessionRepo);
+    const profileService = new ProfileService(db, userDataPath, pushToRenderer);
+
+    const contactProfileService = new ContactProfileService(
+      nknClient,
+      profileService,
+      contactRepo,
+      sessionRepo,
+      pushToRenderer,
+      userDataPath,
+    );
+    chatService.setContactProfileService(contactProfileService);
+
+    // Register post-DB IPC handlers
+    registerPostDbHandlers({
+      chatService,
+      contactService,
+      sessionService,
+      ipfsService,
+      topicService,
+      profileService,
+      privateGroupService,
+    });
+
+    servicesInitialized = true;
+  }
+
+  // 4. Register pre-DB IPC handlers (wallet, client, app)
+  registerPreDbHandlers(nknClient, walletStorage, initServices);
+
   ipcMain.handle(IPC.APP.GET_INFO, () => ({
     name: app.getName(),
     version: app.getVersion(),

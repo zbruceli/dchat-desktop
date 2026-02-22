@@ -349,7 +349,7 @@ export function MessageThread() {
             </div>
           )}
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} showSender={isGroup} />
+            <MessageBubble key={msg.id} message={msg} showSender={true} />
           ))}
           <div ref={messagesEndRef} />
         </div>

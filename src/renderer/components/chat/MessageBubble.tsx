@@ -194,7 +194,7 @@ function InvitationContent({ message }: { message: Message }) {
     } catch { /* ignore */ }
     return (
       <div className="space-y-1">
-        <p className="text-sm text-text-primary">
+        <p className="text-sm">
           Invited {inviteeName ? <span className="font-medium">{inviteeName}</span> : "someone"} to join{" "}
           <span className="font-semibold">{groupName}</span>
         </p>
@@ -304,58 +304,62 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const avatarColor = stringToColor(senderKey);
   const avatarInitial = senderName.charAt(0).toUpperCase();
 
-  // Private group invitation renders specially
-  if (message.contentType === "privateGroup:invitation") {
+  const isInvitation = message.contentType === "privateGroup:invitation";
+
+  const messageContent = (
+    <>
+      {isInvitation ? (
+        <InvitationContent message={message} />
+      ) : isAudio || isIpfsAudio ? (
+        <AudioContent message={message} />
+      ) : isIpfsFile ? (
+        <FileContent message={message} />
+      ) : isIpfsImage ? (
+        <ImageContent message={message} />
+      ) : (
+        <p className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${isOutbound ? "text-white" : "text-text-primary"}`}>
+          {message.content}
+        </p>
+      )}
+    </>
+  );
+
+  // Outbound messages: right-aligned with accent bubble, no avatar
+  if (isOutbound) {
     return (
-      <div className="group flex items-start gap-3 px-5 py-1 hover:bg-surface-hover/50 transition-colors">
-        <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
-          <span className="text-sm text-white font-medium">{avatarInitial}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
+      <div className="flex justify-end px-5 py-1">
+        <div className="max-w-[70%]">
+          <div className="flex items-baseline justify-end gap-2 mb-0.5">
+            <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
+              {statusIcon}
+            </span>
             <span className="text-[11px] text-text-muted">{time}</span>
-            {isOutbound && (
-              <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
-                {statusIcon}
-              </span>
-            )}
           </div>
-          <div className="mt-0.5">
-            <InvitationContent message={message} />
+          <div className="bg-accent-600 rounded-2xl rounded-br-sm px-4 py-2">
+            {messageContent}
           </div>
         </div>
       </div>
     );
   }
 
+  // Inbound messages: left-aligned with avatar
   return (
-    <div className="group flex items-start gap-3 px-5 py-1 hover:bg-surface-hover/50 transition-colors">
-      {/* Avatar */}
-      <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
-        <span className="text-sm text-white font-medium">{avatarInitial}</span>
-      </div>
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
-          <span className="text-[11px] text-text-muted">{time}</span>
-          {isOutbound && (
-            <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : "text-text-faint"}`}>
-              {statusIcon}
-            </span>
-          )}
+    <div className="flex justify-start px-5 py-1">
+      <div className="flex items-start gap-3 max-w-[70%]">
+        <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 ${avatarColor}`}>
+          <span className="text-sm text-white font-medium">{avatarInitial}</span>
         </div>
-        <div className="mt-0.5">
-          {isAudio || isIpfsAudio ? (
-            <AudioContent message={message} />
-          ) : isIpfsFile ? (
-            <FileContent message={message} />
-          ) : isIpfsImage ? (
-            <ImageContent message={message} />
-          ) : (
-            <p className="text-[15px] text-text-primary whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
-          )}
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2 mb-0.5">
+            {showSender && (
+              <span className="text-[13px] font-semibold text-text-primary">{senderName}</span>
+            )}
+            <span className="text-[11px] text-text-muted">{time}</span>
+          </div>
+          <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2">
+            {messageContent}
+          </div>
         </div>
       </div>
     </div>

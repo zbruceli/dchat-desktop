@@ -54,28 +54,44 @@ export class ContactProfileService {
 
   /**
    * Routes incoming contentType "contact" messages to request or response handler.
+   *
+   * nMobile wire format puts requestType/responseType/version at the TOP level
+   * of the JSON envelope (same level as id, contentType, timestamp), not inside
+   * the "content" field. The "content" field holds profile data (name/avatar)
+   * only in "full" responses.
    */
   handleContactMessage(src: string, messageData: MessageData): void {
-    let data: Record<string, unknown>;
-    try {
-      // Content may be a JSON string or already parsed object
-      data =
-        typeof messageData.content === "string" && messageData.content
-          ? JSON.parse(messageData.content)
-          : (messageData.content as unknown as Record<string, unknown>) ?? {};
-    } catch {
-      return;
-    }
+    // Cast to access top-level fields that aren't in the typed MessageData interface
+    const raw = messageData as unknown as Record<string, unknown>;
+    const requestType = raw.requestType as string | undefined;
+    const responseType = raw.responseType as string | undefined;
+    const version = raw.version as string | undefined;
 
-    const requestType = data.requestType as string | undefined;
-    const responseType = data.responseType as string | undefined;
+    // Parse the inner content (profile data) — may be JSON string or object
+    let profileContent: Record<string, unknown> | undefined;
+    if (messageData.content) {
+      try {
+        profileContent =
+          typeof messageData.content === "string"
+            ? JSON.parse(messageData.content)
+            : (messageData.content as unknown as Record<string, unknown>);
+      } catch {
+        // ignore parse errors
+      }
+    }
+    // Also check top-level "content" if it's an object (before stringify in handleIncomingMessage)
+    if (!profileContent && raw.content && typeof raw.content === "object") {
+      profileContent = raw.content as Record<string, unknown>;
+    }
 
     if (requestType) {
       this.handleProfileRequest(src, requestType);
     } else if (responseType) {
-      const version = data.version as string | undefined;
-      const content = data.content as Record<string, unknown> | undefined;
-      this.handleProfileResponse(src, version, responseType, content);
+      this.handleProfileResponse(src, version, responseType, profileContent);
+    } else if (!version) {
+      // nMobile "isDChatRequest" pattern: no requestType, no responseType, no version
+      // means the sender wants our profile
+      this.handleProfileRequest(src, "full");
     }
   }
 

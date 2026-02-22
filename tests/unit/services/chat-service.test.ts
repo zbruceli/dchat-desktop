@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Database from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
 import { EventEmitter } from "events";
 import { ChatService } from "../../../src/main/services/chat-service";
 import { MessageRepository } from "../../../src/main/db/repositories/message-repository";

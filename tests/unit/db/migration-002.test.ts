@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
 import { up as migration001 } from "../../../src/main/db/migrations/001-initial-schema";
 import { up as migration002 } from "../../../src/main/db/migrations/002-add-message-options";
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import type { PrivateGroupMember } from "../../../shared/types";
 import { PrivateGroupItemPerm } from "../../../shared/types";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
@@ -25,6 +25,144 @@ function permColor(perm: number): string {
   return "text-text-faint";
 }
 
+function InviteSection({
+  contacts,
+  members,
+  myAddress,
+  inviting,
+  onInvite,
+}: {
+  contacts: { address: string; name?: string }[];
+  members: PrivateGroupMember[];
+  myAddress: string | undefined;
+  inviting: boolean;
+  onInvite: (addr: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const memberAddresses = new Set(members.map((m) => m.invitee));
+
+  const invitable = contacts.filter(
+    (c) => c.address !== myAddress && !memberAddresses.has(c.address),
+  );
+
+  const filtered = invitable.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      c.address.toLowerCase().includes(q) ||
+      (c.name && c.name.toLowerCase().includes(q))
+    );
+  });
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus();
+  }, [open]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  async function pick(addr: string) {
+    setOpen(false);
+    setSearch("");
+    await onInvite(addr);
+  }
+
+  return (
+    <div ref={panelRef} className="px-3 py-2 border-b border-surface-border">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          disabled={inviting}
+          className="w-full px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] rounded transition-colors flex items-center justify-center gap-1"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {inviting ? "Inviting..." : "Invite Member"}
+        </button>
+      ) : (
+        <div>
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Search contacts or paste address..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setOpen(false);
+                setSearch("");
+              }
+              if (e.key === "Enter" && search.trim().length > 20 && filtered.length === 0) {
+                // Direct address entry if no contact match
+                pick(search.trim());
+              }
+            }}
+            className="w-full px-2 py-1 bg-surface-raised border border-surface-border rounded text-[10px] text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50"
+            disabled={inviting}
+          />
+          <div className="mt-1 max-h-40 overflow-y-auto bg-surface-raised border border-surface-border rounded">
+            {filtered.length > 0 ? (
+              filtered.map((c) => (
+                <button
+                  key={c.address}
+                  onClick={() => pick(c.address)}
+                  className="w-full px-2 py-1.5 text-left hover:bg-surface-hover transition-colors flex items-center gap-2"
+                  disabled={inviting}
+                >
+                  <div className="w-5 h-5 rounded bg-surface-hover flex items-center justify-center flex-shrink-0">
+                    <span className="text-[8px] text-text-secondary">
+                      {(c.name || c.address).charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {c.name && !c.name.endsWith("...") ? (
+                      <>
+                        <span className="text-[10px] text-text-primary block truncate">{c.name}</span>
+                        <span className="text-[9px] text-text-faint block truncate font-mono">{truncateAddr(c.address)}</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-text-primary block truncate font-mono">{truncateAddr(c.address)}</span>
+                    )}
+                  </div>
+                </button>
+              ))
+            ) : search.trim().length > 20 ? (
+              <button
+                onClick={() => pick(search.trim())}
+                className="w-full px-2 py-1.5 text-left hover:bg-surface-hover transition-colors"
+                disabled={inviting}
+              >
+                <span className="text-[10px] text-text-secondary">Invite: </span>
+                <span className="text-[10px] text-text-primary font-mono">{truncateAddr(search.trim())}</span>
+              </button>
+            ) : (
+              <div className="px-2 py-2 text-center">
+                <span className="text-[10px] text-text-muted">
+                  {invitable.length === 0 ? "All contacts already invited" : "No matches"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PrivateGroupMemberPanel({
   groupId,
   onClose,
@@ -34,7 +172,6 @@ export function PrivateGroupMemberPanel({
 }) {
   const [members, setMembers] = useState<PrivateGroupMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteAddr, setInviteAddr] = useState("");
   const [inviting, setInviting] = useState(false);
   const contacts = useContactStore((s) => s.contacts);
   const inviteMember = usePrivateGroupStore((s) => s.inviteMember);
@@ -61,21 +198,6 @@ export function PrivateGroupMemberPanel({
   const isOwner = myMember?.permission === PrivateGroupItemPerm.OWNER;
   const isAdmin = (myMember?.permission ?? 0) >= PrivateGroupItemPerm.ADMIN;
   const activeMembers = members.filter((m) => m.permission > PrivateGroupItemPerm.NONE);
-
-  async function handleInvite() {
-    const addr = inviteAddr.trim();
-    if (!addr) return;
-    setInviting(true);
-    try {
-      await inviteMember(groupId, addr);
-      setInviteAddr("");
-      await loadMembers();
-    } catch (err) {
-      console.error("Failed to invite:", err);
-    } finally {
-      setInviting(false);
-    }
-  }
 
   async function handleKick(targetAddress: string) {
     try {
@@ -111,28 +233,25 @@ export function PrivateGroupMemberPanel({
         </button>
       </div>
 
-      {/* Invite input (owner/admin only) */}
+      {/* Invite section (owner/admin only) */}
       {isAdmin && (
-        <div className="px-3 py-2 border-b border-surface-border">
-          <input
-            type="text"
-            placeholder="Invite NKN address..."
-            value={inviteAddr}
-            onChange={(e) => setInviteAddr(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleInvite();
-            }}
-            className="w-full px-2 py-1 bg-surface-raised border border-surface-border rounded text-[10px] text-text-primary placeholder-text-faint focus:outline-none focus:border-accent-500/50 font-mono"
-            disabled={inviting}
-          />
-          <button
-            onClick={handleInvite}
-            disabled={inviting || !inviteAddr.trim()}
-            className="mt-1 w-full px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] rounded transition-colors"
-          >
-            {inviting ? "Inviting..." : "Invite"}
-          </button>
-        </div>
+        <InviteSection
+          contacts={contacts}
+          members={activeMembers}
+          myAddress={myAddress}
+          inviting={inviting}
+          onInvite={async (addr) => {
+            setInviting(true);
+            try {
+              await inviteMember(groupId, addr);
+              await loadMembers();
+            } catch (err) {
+              console.error("Failed to invite:", err);
+            } finally {
+              setInviting(false);
+            }
+          }}
+        />
       )}
 
       <div className="flex-1 overflow-y-auto">

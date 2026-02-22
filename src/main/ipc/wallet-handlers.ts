@@ -1,36 +1,90 @@
-import { ipcMain, safeStorage } from "electron";
+import { ipcMain } from "electron";
 import nkn from "nkn-sdk";
 import { IPC } from "../../shared/ipc-channels";
-import { getDatabase } from "../db/database";
-import type { WalletInfo } from "../../shared/types";
+import type { NknClientService } from "../services/nkn-client-service";
+import type { WalletStorageService } from "../services/wallet-storage-service";
 
-export function registerWalletHandlers(): void {
-  ipcMain.handle(IPC.WALLET.CREATE, async (_event, password: string) => {
-    const wallet = new nkn.Wallet({ password });
-    const info: WalletInfo = {
-      address: wallet.address,
-      publicKey: wallet.getPublicKey(),
-      seed: wallet.getSeed(),
-      keystore: JSON.stringify(wallet.toJSON()),
-    };
-    return info;
-  });
+export function registerWalletHandlers(
+  nknClient: NknClientService,
+  walletStorage: WalletStorageService,
+  initServices: (seed: string) => void,
+): void {
+  ipcMain.handle(
+    IPC.WALLET.CREATE_AND_CONNECT,
+    async (_event, password: string) => {
+      const wallet = new nkn.Wallet({ password });
+      const seed = wallet.getSeed();
+      const keystore = JSON.stringify(wallet.toJSON());
+      const address = wallet.address;
+      const publicKey = wallet.getPublicKey();
+
+      walletStorage.save(keystore, address, seed);
+      initServices(seed);
+      await nknClient.connect(seed);
+
+      return { address, publicKey };
+    },
+  );
 
   ipcMain.handle(
-    IPC.WALLET.IMPORT,
+    IPC.WALLET.IMPORT_AND_CONNECT,
     async (_event, keystore: string, password: string) => {
       const wallet = await Promise.resolve(
         nkn.Wallet.fromJSON(keystore, { password }),
       );
-      const info: WalletInfo = {
-        address: wallet.address,
-        publicKey: wallet.getPublicKey(),
-        seed: wallet.getSeed(),
-        keystore: JSON.stringify(wallet.toJSON()),
-      };
-      return info;
+      const seed = wallet.getSeed();
+      const normalizedKeystore = JSON.stringify(wallet.toJSON());
+      const address = wallet.address;
+      const publicKey = wallet.getPublicKey();
+
+      walletStorage.save(normalizedKeystore, address, seed);
+      initServices(seed);
+      await nknClient.connect(seed);
+
+      return { address, publicKey };
     },
   );
+
+  ipcMain.handle(
+    IPC.WALLET.RESTORE_AND_CONNECT,
+    async (_event, password: string) => {
+      const saved = walletStorage.load();
+      if (!saved) {
+        throw new Error("No saved wallet found. Create a new one or import.");
+      }
+
+      // Verify password by decrypting keystore
+      const wallet = await Promise.resolve(
+        nkn.Wallet.fromJSON(saved.keystore, { password }),
+      );
+      const address = wallet.address;
+      const publicKey = wallet.getPublicKey();
+
+      initServices(saved.seed);
+      await nknClient.connect(saved.seed);
+
+      return { address, publicKey };
+    },
+  );
+
+  ipcMain.handle(IPC.WALLET.AUTO_CONNECT, async () => {
+    const saved = walletStorage.load();
+    if (!saved) return null;
+
+    initServices(saved.seed);
+    await nknClient.connect(saved.seed);
+
+    return { address: saved.walletAddress, publicKey: "" };
+  });
+
+  ipcMain.handle(IPC.WALLET.HAS_SAVED, () => {
+    return walletStorage.hasSavedWallet();
+  });
+
+  ipcMain.handle(IPC.WALLET.LOGOUT, async () => {
+    await nknClient.disconnect();
+    walletStorage.clear();
+  });
 
   ipcMain.handle(IPC.WALLET.GET_BALANCE, async (_event, address: string) => {
     const rpcAddr = "http://seed.nkn.org:30003";
@@ -53,57 +107,6 @@ export function registerWalletHandlers(): void {
   });
 
   ipcMain.handle(
-    IPC.WALLET.SAVE_SEED,
-    (_event, seed: string, walletAddress: string) => {
-      const db = getDatabase();
-      if (safeStorage.isEncryptionAvailable()) {
-        const encrypted = safeStorage.encryptString(seed);
-        const encoded = encrypted.toString("base64");
-        db.prepare(
-          `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        ).run("encrypted_seed", JSON.stringify(encoded));
-      } else {
-        // Fallback: store seed as-is (less secure, but functional)
-        db.prepare(
-          `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        ).run("encrypted_seed", JSON.stringify(seed));
-      }
-      db.prepare(
-        `INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      ).run("wallet_address", JSON.stringify(walletAddress));
-    },
-  );
-
-  ipcMain.handle(IPC.WALLET.LOAD_SEED, () => {
-    const db = getDatabase();
-    const seedRow = db
-      .prepare(`SELECT value FROM settings WHERE key = ?`)
-      .get("encrypted_seed") as { value: string } | undefined;
-    const addrRow = db
-      .prepare(`SELECT value FROM settings WHERE key = ?`)
-      .get("wallet_address") as { value: string } | undefined;
-
-    if (!seedRow) return null;
-
-    let seed: string;
-    const stored = JSON.parse(seedRow.value);
-    if (safeStorage.isEncryptionAvailable()) {
-      try {
-        const buffer = Buffer.from(stored, "base64");
-        seed = safeStorage.decryptString(buffer);
-      } catch {
-        // If decryption fails (e.g. stored without encryption), try as plain string
-        seed = stored;
-      }
-    } else {
-      seed = stored;
-    }
-
-    const walletAddress = addrRow ? JSON.parse(addrRow.value) : null;
-    return { seed, walletAddress };
-  });
-
-  ipcMain.handle(
     IPC.WALLET.TRANSFER,
     async (
       _event,
@@ -111,25 +114,8 @@ export function registerWalletHandlers(): void {
       amount: string,
       fee: string,
     ): Promise<{ txnHash: string }> => {
-      // Load wallet seed
-      const db = getDatabase();
-      const seedRow = db
-        .prepare(`SELECT value FROM settings WHERE key = ?`)
-        .get("encrypted_seed") as { value: string } | undefined;
-      if (!seedRow) throw new Error("No wallet seed found");
-
-      let seed: string;
-      const stored = JSON.parse(seedRow.value);
-      if (safeStorage.isEncryptionAvailable()) {
-        try {
-          const buffer = Buffer.from(stored, "base64");
-          seed = safeStorage.decryptString(buffer);
-        } catch {
-          seed = stored;
-        }
-      } else {
-        seed = stored;
-      }
+      const seed = walletStorage.loadSeedOnly();
+      if (!seed) throw new Error("No wallet seed found");
 
       const wallet = new nkn.Wallet({ seed });
 
@@ -157,7 +143,7 @@ export function registerWalletHandlers(): void {
         );
       }
 
-      // Execute transfer (buildOnly=false returns txn hash string)
+      // Execute transfer
       const result = await wallet.transferTo(toAddress, amount, {
         fee,
         attrs: undefined,
@@ -170,16 +156,10 @@ export function registerWalletHandlers(): void {
   ipcMain.handle(
     IPC.WALLET.ADDRESS_FROM_CLIENT,
     (_event, clientAddress: string): string => {
-      // NKN client address format: "identifier.publicKey" or just "publicKey"
       const dotIndex = clientAddress.lastIndexOf(".");
-      const publicKey = dotIndex >= 0 ? clientAddress.slice(dotIndex + 1) : clientAddress;
+      const publicKey =
+        dotIndex >= 0 ? clientAddress.slice(dotIndex + 1) : clientAddress;
       return nkn.Wallet.publicKeyToAddress(publicKey);
     },
   );
-
-  ipcMain.handle(IPC.WALLET.CLEAR_SEED, () => {
-    const db = getDatabase();
-    db.prepare(`DELETE FROM settings WHERE key = ?`).run("encrypted_seed");
-    db.prepare(`DELETE FROM settings WHERE key = ?`).run("wallet_address");
-  });
 }

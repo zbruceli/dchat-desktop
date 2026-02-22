@@ -31,21 +31,20 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Contact management** — Add contacts by NKN address, auto-create contacts for unknown senders
 - **Conversation threads** — Session list with last message preview and unread badges
 - **Message status** — Sending/sent/failed indicators on outbound messages
-- **Persistent storage** — SQLite database for message history, contacts, sessions, and settings
+- **Encrypted local storage** — SQLCipher database (AES-256) keyed to wallet seed; wallet data stored in `wallet.json` with safeStorage encryption
 - **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
 - **Auth gate** — Login page when disconnected, full app when connected
 - **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
 - **NKN wallet** — View balance, send NKN tokens to any address (with contact picker and auto client→wallet address conversion), receive section with copyable addresses, transaction links to [nscan.io](https://nscan.io)
 - **Settings page** — Profile editing (nickname + avatar) and IPFS gateway configuration
 - **Public topics (group chat)** — Create/join public topic groups via NKN blockchain subscriptions, subscriber management with side panel, leave with confirmation dialog, text/image/voice/file messaging, nMobile-compatible topic name hashing
-- **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
+- **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members from contact list, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
 - **Contact name resolution** — Contact names displayed throughout session list and message thread headers
 - **Error boundary** — React error boundary catches rendering crashes and displays error details with retry
-- **Slack-style dark UI** — Flat message rows with avatars (no chat bubbles), three-tone surface hierarchy, custom color tokens, thin scrollbars, Tailwind CSS
+- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles, inbound messages left-aligned with avatar and surface-colored bubbles, dark theme with three-tone surface hierarchy, Tailwind CSS
 - Hot-reload development environment
 
 ### Coming Soon
-- **Encrypted local storage** — SQLCipher database encryption (key derived from wallet seed)
 - **Message receipts** — Delivered and read status tracking
 - **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
@@ -68,8 +67,8 @@ cd dchat
 # Install dependencies
 npm install
 
-# Rebuild native modules (better-sqlite3, sharp) for Electron
-npx electron-rebuild -f -w better-sqlite3
+# Rebuild native modules (better-sqlite3-multiple-ciphers, sharp) for Electron
+npx electron-rebuild -f -w better-sqlite3-multiple-ciphers
 npx electron-rebuild -f -w sharp
 
 # Start in development mode (hot reload)

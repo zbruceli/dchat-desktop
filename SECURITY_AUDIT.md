@@ -7,15 +7,13 @@
 
 ```
 LoginPage (renderer)
-  │ wallet:create / wallet:import
+  │ wallet:createAndConnect / wallet:importAndConnect / wallet:restoreAndConnect
   ▼
-wallet-handlers.ts (main)          ◄── returns WalletInfo { seed, address, publicKey, keystore }
+wallet-handlers.ts (main)          ◄── returns { address, publicKey } only (no seed)
   │
-  ├─► settings table: "keystore"        (password-encrypted JSON, stored plaintext in DB)
-  ├─► settings table: "encrypted_seed"  (safeStorage-encrypted, plaintext fallback)
-  └─► settings table: "wallet_address"  (plaintext)
+  ├─► wallet.json: keystore + safeStorage-encrypted seed (file in userData)
   │
-  │ client:connect(seed)
+  │ initServices(seed) → DB key = SHA256(seed)
   ▼
 NknClientService (main)
   │ this.seed = seed                    (held in memory for session lifetime)
@@ -27,70 +25,60 @@ nkn.MultiClient({ seed })
 
 ### CRITICAL
 
-#### C1. Seed returned to renderer process in plaintext
+#### C1. ~~Seed returned to renderer process in plaintext~~ — FIXED
 
-**Files:**
-- `src/main/ipc/wallet-handlers.ts:13` — `seed: wallet.getSeed()` in create handler
-- `src/main/ipc/wallet-handlers.ts:28` — `seed: wallet.getSeed()` in import handler
-- `src/shared/types/wallet.ts:4` — `WalletInfo` interface includes `seed: string`
-- `src/renderer/pages/Login/LoginPage.tsx:22-26` — seed held in React variable after create
-- `src/renderer/pages/Login/LoginPage.tsx:42-46` — seed held in React variable after import
-- `src/renderer/stores/client-store.ts:48-56` — `loadSeed()` returns seed to renderer on auto-connect
-- `src/preload/index.ts:21-22` — `client.connect(seed)` sends seed over IPC
+**Status:** Fixed (2026-02-21)
 
-**Risk:** Seed visible in DevTools IPC inspector, held in renderer memory, accessible via XSS.
+**What was done:**
+- Removed `seed` from `WalletInfo` type
+- Wallet handlers now return only `{ address, publicKey }`
+- Removed `client:connect(seed)` IPC — connection happens through wallet handlers
+- Removed `wallet:saveSeed`, `wallet:loadSeed`, `wallet:clearSeed` IPC channels
+- New flow: `wallet:createAndConnect`, `wallet:importAndConnect`, `wallet:restoreAndConnect`, `wallet:autoConnect`
+- Seed never crosses the IPC boundary to renderer
+- Created `WalletStorageService` to manage `wallet.json` with safeStorage encryption
 
-**Fix:** Remove `seed` from `WalletInfo`. Have `wallet:create`/`import` store seed internally in main process. Change `client:connect` to accept keystore + password instead of raw seed.
+#### C2. ~~Plaintext fallback when safeStorage unavailable~~ — FIXED
 
-#### C2. Plaintext fallback when safeStorage unavailable
+**Status:** Fixed (2026-02-21)
 
-**Files:**
-- `src/main/ipc/wallet-handlers.ts:66-70` — if `safeStorage.isEncryptionAvailable()` is false, seed stored as plaintext JSON in SQLite
-- `src/main/ipc/wallet-handlers.ts:94-96` — on decryption failure, silently falls back to treating stored value as plaintext
-- `src/main/ipc/wallet-handlers.ts:128-131` — same pattern in transfer handler
+**What was done:**
+- Removed all plaintext fallback branches
+- `WalletStorageService.save()` and `load()` throw descriptive errors if `safeStorage.isEncryptionAvailable()` returns false
+- Error message tells user about platform requirements (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 
-**Risk:** On Linux without Secret Service (or headless/CI environments), seed is completely unprotected. No user warning.
+#### C3. ~~Database is unencrypted plain SQLite~~ — FIXED
 
-**Fix:** Throw error if safeStorage unavailable. Show user warning about platform requirements.
+**Status:** Fixed (2026-02-21)
 
-#### C3. Database is unencrypted plain SQLite
-
-**Files:**
-- `src/main/db/database.ts:1,11` — uses `better-sqlite3`, not SQLCipher
-- `src/main/db/migrations/001-initial-schema.ts:45-48` — settings table is plain TEXT
-
-**Risk:** Database at `{userData}/dchat.db` is a regular file. Anyone with filesystem access reads all data: keystore, seed (if fallback), wallet address, all messages, all contacts.
-
-**Fix:** Switch to `better-sqlite3-multiple-ciphers`, derive DB key from SHA-256(wallet seed).
+**What was done:**
+- Swapped `better-sqlite3` for `better-sqlite3-multiple-ciphers` (SQLCipher)
+- DB encryption key derived from `hex(SHA256(seed))` — matches nMobile convention
+- `initDatabase()` accepts optional encryption key, sets `PRAGMA key`
+- Existing unencrypted databases migrated via `PRAGMA rekey` on first launch
+- Deferred DB initialization — DB only opened after wallet is loaded (seed available)
 
 ### HIGH
 
 #### H1. Keystore stored in plaintext SQLite
 
-**Files:**
-- `src/renderer/pages/Login/LoginPage.tsx:23,43` — `settings.set("keystore", wallet.keystore)`
-- `src/main/ipc/settings-handlers.ts:20-25` — generic handler stores as plain TEXT
-
-**Risk:** Attacker with DB access gets keystore and only needs to brute-force the user's password.
-
-**Fix:** Encrypt keystore with safeStorage before storing, or rely on SQLCipher for at-rest protection.
+**Status:** Mitigated by C3 fix — keystore now stored in encrypted SQLCipher database AND in `wallet.json` (encrypted by safeStorage).
 
 #### H2. Unrestricted settings API
 
 **Files:**
 - `src/main/ipc/settings-handlers.ts:7-18` — `settings:get(key)` accepts any key, no validation
-- `src/preload/index.ts:134-139` — renderer can call `window.dchat.settings.get("encrypted_seed")`
+- `src/preload/index.ts` — renderer can call `window.dchat.settings.get()` with any key
 
-**Risk:** Compromised renderer or XSS can read encrypted seed and keystore through the generic API.
+**Risk:** Compromised renderer or XSS can read sensitive data through the generic API.
 
-**Fix:** Add allowlist of safe keys (`ipfs_config`, `profile_*`). Use dedicated handlers for sensitive data.
+**Fix:** Add allowlist of safe keys (`ipfs_config`, `profile_*`). Use dedicated handlers for sensitive data. Seed and keystore are no longer stored in settings table (moved to `wallet.json`), but encrypted_seed/wallet_address rows may still exist in legacy databases.
 
 #### H3. Seed held in memory for entire session
 
 **Files:**
-- `src/main/services/nkn-client-service.ts:20` — `this.seed = seed` as instance field
+- `src/main/services/nkn-client-service.ts:9` — `this.seed = seed` as instance field
 - `src/main/services/nkn-client-service.ts:84-86` — public `getSeed()` method returns it
-- `src/main/services/nkn-client-service.ts:66` — only cleared on disconnect error, not normal disconnect
 
 **Risk:** Memory dump exposes seed. No secure zeroing.
 
@@ -100,21 +88,21 @@ nkn.MultiClient({ seed })
 
 #### M1. DevTools open in development mode
 
-**File:** `src/main/index.ts:48` — `mainWindow.webContents.openDevTools()` in dev builds.
+**File:** `src/main/index.ts` — `mainWindow.webContents.openDevTools()` in dev builds.
 
-**Risk:** All IPC traffic including seed visible. Not a production risk if `isDev` flag works correctly.
+**Risk:** All IPC traffic visible. Not a production risk if `isDev` flag works correctly. Seed is no longer in IPC traffic.
 
 #### M2. Sandbox disabled for preload
 
-**File:** `src/main/index.ts:42` — `sandbox: false`.
+**File:** `src/main/index.ts` — `sandbox: false`.
 
 **Risk:** Preload has full Node.js access. Necessary for current architecture but increases attack surface.
 
 #### M3. No restrictive file permissions on database
 
-**Risk:** DB file inherits OS default umask. On Linux, may be world-readable.
+**Risk:** DB file inherits OS default umask. On Linux, may be world-readable. Mitigated by SQLCipher encryption.
 
-**Fix:** Set `0600` on `dchat.db` after creation.
+**Fix:** Set `0600` on `dchat.db` and `wallet.json` after creation.
 
 ## What's Done Right
 
@@ -123,18 +111,21 @@ nkn.MultiClient({ seed })
 - No seeds in console.log — checked all 80+ log statements
 - No hardcoded test seeds or keys in codebase
 - CSP configured — no `unsafe-eval`, limited origins
-- safeStorage used when available — macOS Keychain / Windows DPAPI
+- safeStorage required — macOS Keychain / Windows DPAPI / Linux Secret Service (no plaintext fallback)
+- Seed never leaves main process — not in IPC messages, not in renderer memory
+- Database encrypted with SQLCipher — key derived from wallet seed
 - Keystore is password-encrypted by nkn-sdk internally
 - NKN messages are end-to-end encrypted by the SDK
 - IPFS files are AES-128-GCM encrypted before upload
+- Wallet data stored in `wallet.json` with safeStorage encryption
 
 ## Remediation Plan
 
-| # | Fix | Priority | Effort | Blocked By |
-|---|-----|----------|--------|------------|
-| 1 | Keep seed in main process only — remove from `WalletInfo`, change `client:connect` to accept keystore+password | Critical | Medium | — |
-| 2 | Fail instead of plaintext fallback when safeStorage unavailable | Critical | Small | — |
-| 3 | Enable SQLCipher — `better-sqlite3` → `better-sqlite3-multiple-ciphers` | Critical | Medium | — |
-| 4 | Allowlist settings keys — block renderer access to sensitive keys | High | Small | — |
-| 5 | Zero seed in NknClientService after client init, remove `getSeed()` | High | Small | #1 |
-| 6 | Set `0600` file permissions on database | Medium | Small | — |
+| # | Fix | Priority | Effort | Status |
+|---|-----|----------|--------|--------|
+| 1 | Keep seed in main process only | Critical | Medium | **Done** |
+| 2 | Fail instead of plaintext fallback | Critical | Small | **Done** |
+| 3 | Enable SQLCipher | Critical | Medium | **Done** |
+| 4 | Allowlist settings keys | High | Small | Open |
+| 5 | Zero seed in NknClientService after client init | High | Small | Open |
+| 6 | Set `0600` file permissions on database and wallet.json | Medium | Small | Open |

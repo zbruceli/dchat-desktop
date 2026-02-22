@@ -6,12 +6,13 @@ interface ClientState {
   walletAddress: string | null;
   autoConnectAttempted: boolean;
   error: string | null;
-  connect: (seed: string) => Promise<void>;
-  disconnect: () => Promise<void>;
+  createAndConnect: (password: string) => Promise<void>;
+  importAndConnect: (keystore: string, password: string) => Promise<void>;
+  restoreAndConnect: (password: string) => Promise<void>;
   autoConnect: () => Promise<void>;
+  disconnect: () => Promise<void>;
   refreshStatus: () => Promise<void>;
   setStatus: (status: ClientStatus) => void;
-  setWalletAddress: (address: string) => void;
   setError: (error: string | null) => void;
   echoTest: () => Promise<{ success: boolean; rtt: number; error?: string }>;
 }
@@ -22,11 +23,36 @@ export const useClientStore = create<ClientState>((set, get) => ({
   autoConnectAttempted: false,
   error: null,
 
-  connect: async (seed: string) => {
-    set({ error: null });
+  createAndConnect: async (password: string) => {
+    set({ error: null, status: { state: "connecting" } });
     try {
-      const status = await window.dchat.client.connect(seed);
-      set({ status });
+      const result = await window.dchat.wallet.createAndConnect(password);
+      set({ walletAddress: result.address });
+      // Status will be updated via push event
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Connection failed";
+      set({ error: message, status: { state: "disconnected" } });
+      throw err;
+    }
+  },
+
+  importAndConnect: async (keystore: string, password: string) => {
+    set({ error: null, status: { state: "connecting" } });
+    try {
+      const result = await window.dchat.wallet.importAndConnect(keystore, password);
+      set({ walletAddress: result.address });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Connection failed";
+      set({ error: message, status: { state: "disconnected" } });
+      throw err;
+    }
+  },
+
+  restoreAndConnect: async (password: string) => {
+    set({ error: null, status: { state: "connecting" } });
+    try {
+      const result = await window.dchat.wallet.restoreAndConnect(password);
+      set({ walletAddress: result.address });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Connection failed";
       set({ error: message, status: { state: "disconnected" } });
@@ -35,8 +61,7 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   disconnect: async () => {
-    await window.dchat.wallet.clearSeed();
-    await window.dchat.client.disconnect();
+    await window.dchat.wallet.logout();
     set({ status: { state: "disconnected" }, walletAddress: null, error: null });
   },
 
@@ -45,16 +70,15 @@ export const useClientStore = create<ClientState>((set, get) => ({
     set({ autoConnectAttempted: true });
 
     try {
-      const saved = await window.dchat.wallet.loadSeed();
-      if (!saved) return;
+      const hasSaved = await window.dchat.wallet.hasSaved();
+      if (!hasSaved) return;
 
       set({ error: null, status: { state: "connecting" } });
-      if (saved.walletAddress) {
-        set({ walletAddress: saved.walletAddress });
-      }
 
-      const status = await window.dchat.client.connect(saved.seed);
-      set({ status });
+      const result = await window.dchat.wallet.autoConnect();
+      if (result) {
+        set({ walletAddress: result.address });
+      }
     } catch (err) {
       console.error("Auto-connect failed:", err);
       set({ status: { state: "disconnected" } });
@@ -67,7 +91,6 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   setStatus: (status: ClientStatus) => set({ status }),
-  setWalletAddress: (address: string) => set({ walletAddress: address }),
   setError: (error: string | null) => set({ error }),
 
   echoTest: async () => {

@@ -8,7 +8,7 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), and Phase 4 NKN wallet are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, and wallet support: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile.
+Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), Phase 4 NKN wallet, and Phase 5 security hardening are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, wallet support, and encrypted-at-rest storage: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile. The wallet seed never leaves the main process, the database is encrypted with SQLCipher, and safeStorage is required (no plaintext fallback).
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
@@ -25,21 +25,22 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **AES-GCM crypto** — Encrypt/decrypt with 16-byte keys, 12-byte nonce prepended to ciphertext, nMobile-compatible format (`src/main/crypto/aes-gcm.ts`)
 - **Custom protocol** — `dchat-media://` file protocol for serving cached images, audio, and files to renderer securely (with explicit MIME types)
 - **Contact management** — Add/delete contacts by NKN address, auto-create contacts for unknown senders (`src/main/services/contact-service.ts`)
-- **SQLite database** — `better-sqlite3` with WAL mode, foreign keys, version-based migrations (`src/main/db/`)
+- **SQLCipher database** — `better-sqlite3-multiple-ciphers` with AES-256 encryption (key = SHA256(seed)), WAL mode, foreign keys, version-based migrations, auto-migration from unencrypted DB (`src/main/db/`)
 - **Ed25519 signature crypto** — Sign/verify with nkn-sdk + libsodium, SHA256→hex→Ed25519 signature chain, group version generation (MD5-based), nMobile-compatible (`src/main/crypto/ed25519-signature.ts`)
 - **Repository pattern** — MessageRepository, ContactRepository, SessionRepository, TopicRepository, TopicSubscriberRepository, PrivateGroupRepository, PrivateGroupMemberRepository with typed row mapping
-- **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page (`src/main/services/profile-service.ts`)
+- **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page, profile exchange with nMobile contacts (`src/main/services/profile-service.ts`, `src/main/services/contact-profile-service.ts`)
+- **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process (`src/main/services/wallet-storage-service.ts`)
 - **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group stores with IPC subscription hooks (`src/renderer/stores/`)
 - **Login page** — Create wallet, import wallet (keystore JSON), restore saved wallet (`src/renderer/pages/Login/`)
-- **Slack-style UI** — Flat message rows with avatars (no colored bubbles), three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
+- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles (white text), inbound messages left-aligned with avatar and surface-colored bubbles, three-tone surface hierarchy (deepest→deep→base), custom Tailwind color tokens (`surface`, `accent`, `text`, `badge`), thin scrollbars, font smoothing (`tailwind.config.js`, `src/renderer/styles/global.css`)
 - **Chat UI** — Two-panel layout: session list with unread badges + message thread with auto-scroll, image display with thumbnail preview (`src/renderer/pages/Chat/`)
 - **Image UI** — Thumbnail preview while downloading, full-size display, lightbox modal with backdrop blur, retry on failure, upload progress (`src/renderer/components/chat/MessageBubble.tsx`)
 - **Voice message UI** — Record button (click-to-start/stop, 0.5s–60s), audio player with play/pause, progress bar, duration display (`src/renderer/components/chat/VoiceRecordButton.tsx`, `AudioContent.tsx`)
 - **File message UI** — File attachment button (paperclip icon), file display with doc icon, filename, size, upload/download progress, click-to-open with system default app, retry on failure (`src/renderer/components/chat/FileContent.tsx`)
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list (falls back to truncated NKN address), member count display, subscriber side panel with refresh from blockchain, Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
-- **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with invite/kick, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
+- **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with contact-picker invite/kick, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions (`src/renderer/pages/Contacts/`)
 - **Settings UI** — Profile editing (avatar + nickname) and IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
@@ -51,14 +52,14 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service
 
 ### What's not yet built
-- SQLCipher encryption (currently plain SQLite — swap `better-sqlite3` for `better-sqlite3-multiple-ciphers`) — see `SECURITY_AUDIT.md`
-- Seed isolation (keep seed in main process only, never return to renderer) — see `SECURITY_AUDIT.md`
-- Settings API allowlist (block renderer access to `encrypted_seed`, `keystore`) — see `SECURITY_AUDIT.md`
-- safeStorage plaintext fallback removal (fail instead of storing unencrypted on Linux) — see `SECURITY_AUDIT.md`
+- ~~SQLCipher encryption~~ (done — `better-sqlite3-multiple-ciphers` with SHA256(seed) key)
+- ~~Seed isolation~~ (done — seed never leaves main process, `WalletStorageService` + safeStorage)
+- ~~safeStorage plaintext fallback~~ (done — throws error if unavailable)
+- Settings API allowlist (block renderer access to sensitive keys) — see `SECURITY_AUDIT.md`
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
+- ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - Message receipts (delivered/read status)
 - Video sharing
-- ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - Media messages in topics (video — images, audio, and file now supported)
 - Desktop notifications
 
@@ -70,12 +71,12 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 | UI Framework | React 18 with TypeScript | Installed |
 | State Management | Zustand 4 | Installed |
 | Styling | Tailwind CSS 3 | Installed |
-| Database | better-sqlite3 (plain SQLite for now) | Installed |
+| Database | better-sqlite3-multiple-ciphers (SQLCipher) | Installed |
 | NKN Networking | nkn-sdk | Installed |
 | Crypto | Node.js `crypto` module (AES-128-GCM) | Implemented |
 | Image Processing | sharp (resize, thumbnail generation) | Installed |
 | Audio Processing | fluent-ffmpeg + @ffmpeg-installer/ffmpeg (WebM→AAC) | Installed |
-| Secure Storage | Electron safeStorage API | Not yet added |
+| Secure Storage | Electron safeStorage API | Implemented |
 | File Storage | IPFS (HTTP gateway, nMobile nodes) | Implemented |
 | Native rebuild | @electron/rebuild | Installed |
 | Build/Bundle | Vite 6 (renderer), electron-builder 25 (packaging) | Installed |
@@ -116,14 +117,14 @@ dchat/
 ├── .gitignore
 ├── src/
 │   ├── main/                        # Electron main process
-│   │   ├── index.ts                 # ✅ App entry, DB init, services wiring, IPC registration
+│   │   ├── index.ts                 # ✅ App entry, deferred DB init, two-phase IPC registration, protocol handler
 │   │   ├── ipc/                     # IPC handlers (main ↔ renderer bridge)
-│   │   │   ├── register-all.ts      # ✅ Barrel that registers all handler groups
-│   │   │   ├── client-handlers.ts   # ✅ client:connect/disconnect/getStatus
+│   │   │   ├── register-all.ts      # ✅ Split into registerPreDbHandlers + registerPostDbHandlers
+│   │   │   ├── client-handlers.ts   # ✅ client:disconnect/getStatus/echoTest (connect removed — handled by wallet handlers)
 │   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages/sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-handlers.ts  # ✅ contact:add/list/get/delete
 │   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
-│   │   │   ├── wallet-handlers.ts   # ✅ wallet:create/import/transfer/addressFromClient (NKN SDK)
+│   │   │   ├── wallet-handlers.ts   # ✅ wallet:createAndConnect/importAndConnect/restoreAndConnect/autoConnect/logout/transfer/addressFromClient (seed never leaves main)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
 │   │   │   ├── topic-handlers.ts   # ✅ topic:create/join/leave/list/get/getSubscribers/refreshSubscribers/sendMessage/sendImage/sendAudio/sendFile
 │   │   │   ├── private-group-handlers.ts # ✅ privateGroup:create/list/get/invite/accept/quit/kick/getMembers/sendMessage/sendImage/sendAudio/sendFile
@@ -139,9 +140,12 @@ dchat/
 │   │   │   ├── ipfs-service.ts      # ✅ IPFS HTTP API upload/download, multi-gateway fallback
 │   │   │   ├── contact-service.ts   # ✅ Contact CRUD wrapper
 │   │   │   ├── session-service.ts   # ✅ Session CRUD wrapper
-│   │   │   └── profile-service.ts   # ✅ Avatar resize (200x200 JPEG), nickname/avatar persistence, profile version UUID
+│   │   │   ├── profile-service.ts   # ✅ Avatar resize (200x200 JPEG), nickname/avatar persistence, profile version UUID
+│   │   │   ├── contact-profile-service.ts # ✅ Profile exchange with nMobile contacts (request/response, avatar sync)
+│   │   │   └── wallet-storage-service.ts # ✅ wallet.json management with safeStorage encryption
 │   │   ├── db/                      # Data access layer
-│   │   │   ├── database.ts          # ✅ SQLite singleton (init/get/close, WAL, FK)
+│   │   │   ├── database.ts          # ✅ SQLCipher singleton (init with encryption key/get/close, WAL, FK)
+│   │   │   ├── migrate-to-encrypted.ts # ✅ Migrate existing unencrypted DB to SQLCipher via PRAGMA rekey
 │   │   │   ├── migrations/
 │   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (6 migrations)
 │   │   │   │   ├── 001-initial-schema.ts  # ✅ contact, session, message, settings tables
@@ -167,7 +171,7 @@ dchat/
 │   │   ├── App.tsx                  # ✅ Auth gate + sidebar nav + page routing
 │   │   ├── env.d.ts                 # ✅ Window.dchat type declaration
 │   │   ├── stores/
-│   │   │   ├── client-store.ts      # ✅ Connection state, connect/disconnect
+│   │   │   ├── client-store.ts      # ✅ Connection state, createAndConnect/importAndConnect/restoreAndConnect/autoConnect/disconnect (no seed in renderer)
 │   │   │   ├── chat-store.ts        # ✅ Messages by session, send/load/incoming, sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-store.ts     # ✅ Contact list, add/delete
 │   │   │   ├── session-store.ts     # ✅ Session list, real-time updates, delete events
@@ -185,13 +189,13 @@ dchat/
 │   │   │   ├── chat/
 │   │   │   │   ├── SessionList.tsx  # ✅ Conversation list with previews + unread badges
 │   │   │   │   ├── MessageThread.tsx # ✅ Scrollable messages + input, auto-scroll
-│   │   │   │   ├── MessageBubble.tsx # ✅ Text + image + audio + file bubbles, thumbnail preview, retry, lightbox
+│   │   │   │   ├── MessageBubble.tsx # ✅ Outbound right-aligned accent bubbles, inbound left-aligned with avatar, image/audio/file/invitation content
 │   │   │   │   ├── MessageInput.tsx # ✅ Text input + image attachment + file attachment + voice record button
 │   │   │   │   ├── FileContent.tsx  # ✅ File display (doc icon, name, size, download/open/retry)
 │   │   │   │   ├── AudioContent.tsx # ✅ Audio player (play/pause, progress bar, duration)
 │   │   │   │   ├── VoiceRecordButton.tsx # ✅ Click-to-record mic button (0.5s–60s, cancel, send)
 │   │   │   │   ├── ImageModal.tsx   # ✅ Full-screen image lightbox overlay
-│   │   │   │   └── PrivateGroupMemberPanel.tsx # ✅ Member list with invite/kick, permission badges, leave button
+│   │   │   │   └── PrivateGroupMemberPanel.tsx # ✅ Member list with contact-picker invite, kick, permission badges, leave button
 │   │   │   └── common/
 │   │   │       └── ConnectionStatus.tsx # ✅ Avatar circle + status dot overlay + nickname + profile editing popover
 │   │   ├── hooks/
@@ -204,7 +208,7 @@ dchat/
 │   │   │   ├── message.ts           # ✅ Message, MessageData (with topic + groupId fields), MessageOptions, MessageStatus, SendMessageParams
 │   │   │   ├── contact.ts           # ✅ Contact, AddContactParams
 │   │   │   ├── session.ts           # ✅ Session, SessionType
-│   │   │   ├── wallet.ts            # ✅ WalletInfo, CreateWalletParams, ImportWalletParams
+│   │   │   ├── wallet.ts            # ✅ WalletInfo (no seed field), CreateWalletParams, ImportWalletParams
 │   │   │   ├── client.ts            # ✅ ClientStatus
 │   │   │   ├── topic.ts             # ✅ Topic, TopicSubscriber
 │   │   │   ├── private-group.ts    # ✅ PrivateGroup, PrivateGroupMember, PrivateGroupItemPerm
@@ -506,8 +510,10 @@ Migration history:
 nMobile uses `ParallelQueue` extensively for serialized async execution per key (per-contact, per-conversation). Use `p-queue` with concurrency=1 per key, or `async-mutex` for the same pattern in Node.js.
 
 ### Security Requirements
-- Private keys never leave the device; stored via Electron safeStorage
-- Database encrypted with SQLCipher; password derived from SHA-256(wallet seed)
+- Private keys never leave the main process; wallet seed encrypted via Electron safeStorage in `wallet.json`, never sent to renderer
+- Database encrypted with SQLCipher (`better-sqlite3-multiple-ciphers`); key = `hex(SHA-256(wallet seed))`
+- safeStorage is required — app throws error if OS keychain unavailable (no plaintext fallback)
+- Deferred DB initialization — database only opened after wallet provides the seed
 - All NKN messages are end-to-end encrypted by the SDK
 - Files uploaded to IPFS are encrypted with AES-128-GCM (16-byte key, 12-byte nonce) before upload
 - No telemetry or analytics without explicit user consent

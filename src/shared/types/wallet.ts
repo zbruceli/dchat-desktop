@@ -1,8 +1,8 @@
 export interface WalletInfo {
   address: string;
   publicKey: string;
-  seed: string;
   keystore: string;
+  // seed intentionally omitted — never sent to renderer
 }
 
 export interface CreateWalletParams {

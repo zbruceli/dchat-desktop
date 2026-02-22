@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
 import { MessageRepository } from "../../../src/main/db/repositories/message-repository";
 import { runMigrations } from "../../../src/main/db/migrations/migration-runner";
 import type { Message } from "../../../src/shared/types";

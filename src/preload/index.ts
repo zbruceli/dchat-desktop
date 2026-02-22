@@ -3,7 +3,6 @@ import type {
   Message,
   Contact,
   Session,
-  WalletInfo,
   ClientStatus,
   Topic,
   TopicSubscriber,
@@ -18,8 +17,6 @@ const api = {
       ipcRenderer.invoke("app:getInfo"),
   },
   client: {
-    connect: (seed: string): Promise<ClientStatus> =>
-      ipcRenderer.invoke("client:connect", seed),
     disconnect: (): Promise<void> =>
       ipcRenderer.invoke("client:disconnect"),
     getStatus: (): Promise<ClientStatus> =>
@@ -90,18 +87,20 @@ const api = {
     },
   },
   wallet: {
-    create: (password: string): Promise<WalletInfo> =>
-      ipcRenderer.invoke("wallet:create", password),
-    import: (keystore: string, password: string): Promise<WalletInfo> =>
-      ipcRenderer.invoke("wallet:import", keystore, password),
+    createAndConnect: (password: string): Promise<{ address: string; publicKey: string }> =>
+      ipcRenderer.invoke("wallet:createAndConnect", password),
+    importAndConnect: (keystore: string, password: string): Promise<{ address: string; publicKey: string }> =>
+      ipcRenderer.invoke("wallet:importAndConnect", keystore, password),
+    restoreAndConnect: (password: string): Promise<{ address: string; publicKey: string }> =>
+      ipcRenderer.invoke("wallet:restoreAndConnect", password),
+    autoConnect: (): Promise<{ address: string; publicKey: string } | null> =>
+      ipcRenderer.invoke("wallet:autoConnect"),
+    hasSaved: (): Promise<boolean> =>
+      ipcRenderer.invoke("wallet:hasSaved"),
+    logout: (): Promise<void> =>
+      ipcRenderer.invoke("wallet:logout"),
     getBalance: (address: string): Promise<string> =>
       ipcRenderer.invoke("wallet:getBalance", address),
-    saveSeed: (seed: string, walletAddress: string): Promise<void> =>
-      ipcRenderer.invoke("wallet:saveSeed", seed, walletAddress),
-    loadSeed: (): Promise<{ seed: string; walletAddress: string } | null> =>
-      ipcRenderer.invoke("wallet:loadSeed"),
-    clearSeed: (): Promise<void> =>
-      ipcRenderer.invoke("wallet:clearSeed"),
     transfer: (
       toAddress: string,
       amount: string,

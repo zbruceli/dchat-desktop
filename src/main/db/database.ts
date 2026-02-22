@@ -1,14 +1,21 @@
-import Database from "better-sqlite3";
+import Database from "better-sqlite3-multiple-ciphers";
 import path from "path";
 import { runMigrations } from "./migrations/migration-runner";
 
 let db: Database.Database | null = null;
 
-export function initDatabase(userDataPath: string): Database.Database {
+export function initDatabase(
+  userDataPath: string,
+  encryptionKey?: string,
+): Database.Database {
   if (db) return db;
 
   const dbPath = path.join(userDataPath, "dchat.db");
   db = new Database(dbPath);
+
+  if (encryptionKey) {
+    db.pragma(`key = '${encryptionKey}'`);
+  }
 
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
