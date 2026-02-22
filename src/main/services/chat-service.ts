@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { Notification, type BrowserWindow } from "electron";
 import type { NknClientService } from "./nkn-client-service";
 import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
@@ -10,6 +11,7 @@ import type { ContactProfileService } from "./contact-profile-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
+import { getDatabase } from "../db/database";
 import type {
   Message,
   MessageData,
@@ -38,6 +40,8 @@ export class ChatService {
   private topicService: TopicService | null = null;
   private privateGroupService: PrivateGroupService | null = null;
   private contactProfileService: ContactProfileService | null = null;
+  private mainWindow: BrowserWindow | null = null;
+  private activeSessionId: string | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -114,6 +118,62 @@ export class ChatService {
 
   setContactProfileService(service: ContactProfileService): void {
     this.contactProfileService = service;
+  }
+
+  setMainWindow(win: BrowserWindow): void {
+    this.mainWindow = win;
+  }
+
+  setActiveSessionId(sessionId: string | null): void {
+    this.activeSessionId = sessionId;
+  }
+
+  /**
+   * Show a desktop notification for an incoming message.
+   * Suppressed when the window is focused AND the user is viewing the relevant session,
+   * or when the session is muted, or when global mute is enabled.
+   */
+  showNotification(title: string, body: string, sessionId: string): void {
+    // Suppress if window is focused and user is viewing this conversation
+    if (
+      this.mainWindow &&
+      !this.mainWindow.isDestroyed() &&
+      this.mainWindow.isFocused() &&
+      this.activeSessionId === sessionId
+    ) {
+      return;
+    }
+
+    // Check per-session mute
+    const session = this.sessionRepo.findById(sessionId);
+    if (session?.muted) return;
+
+    // Check global mute
+    try {
+      const db = getDatabase();
+      const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get("notifications_muted") as
+        | { value: string | null }
+        | undefined;
+      if (row?.value) {
+        try {
+          if (JSON.parse(row.value) === true) return;
+        } catch {
+          // ignore parse errors
+        }
+      }
+    } catch {
+      // DB not available — allow notification
+    }
+
+    const notification = new Notification({ title, body });
+    notification.on("click", () => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+        this.mainWindow.focus();
+        this.pushToRenderer("chat:onNavigateToSession", sessionId);
+      }
+    });
+    notification.show();
   }
 
   async sendImageMessage(to: string, filePath: string): Promise<Message> {
@@ -549,6 +609,18 @@ export class ChatService {
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
 
+    // Desktop notification
+    const contact = this.contactRepo.findByAddress(src);
+    const displayName = contact?.name ?? src.substring(0, 8) + "...";
+    const notifBody = isAudio || isIpfsAudio
+      ? "Voice Message"
+      : isIpfsFile
+        ? "File"
+        : isIpfs
+          ? "Image"
+          : content;
+    this.showNotification(displayName, notifBody, session.id);
+
     // Check if sender's profile version changed (direct messages only)
     if (this.contactProfileService) {
       this.contactProfileService.checkAndRequestProfile(src, messageData);
@@ -956,6 +1028,7 @@ export class ChatService {
         lastMessageContent: "",
         lastMessageAt: now,
         unreadCount: 0,
+        muted: false,
         createdAt: now,
         updatedAt: now,
       };

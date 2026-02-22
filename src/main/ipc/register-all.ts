@@ -39,10 +39,13 @@ export interface PostDbHandlersParams {
   userDataPath: string;
 }
 
-export function registerPostDbHandlers(params: PostDbHandlersParams): void {
+export function registerPostDbHandlers(
+  params: PostDbHandlersParams,
+  pushToRenderer: (channel: string, data: unknown) => void,
+): void {
   registerChatHandlers(params.chatService);
   registerContactHandlers(params.contactService);
-  registerSessionHandlers(params.sessionService, params.chatService);
+  registerSessionHandlers(params.sessionService, params.chatService, pushToRenderer);
   registerSettingsHandlers(params.ipfsService);
   if (params.topicService) {
     registerTopicHandlers(params.topicService);

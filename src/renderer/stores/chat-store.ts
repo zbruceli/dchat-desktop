@@ -30,6 +30,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setActiveSession: (sessionId: string | null) => {
     set({ activeSessionId: sessionId });
+    // Notify main process so it can suppress notifications for the active conversation
+    window.dchat.chat.setActiveSession(sessionId).catch(console.error);
     if (sessionId) {
       get().loadMessages(sessionId);
       window.dchat.chat.markRead(sessionId).catch(console.error);

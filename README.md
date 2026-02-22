@@ -42,9 +42,11 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - **Auth gate** — Login page when disconnected, full app when connected
 - **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
 - **NKN wallet** — View balance, send NKN tokens to any address (with contact picker and auto client→wallet address conversion), receive section with copyable addresses, transaction links to [nscan.io](https://nscan.io)
-- **Settings page** — Profile editing (nickname + avatar) and IPFS gateway configuration
+- **Settings page** — Profile editing (nickname + avatar), notification mute toggle, and IPFS gateway configuration
 - **Public topics (group chat)** — Create/join public topic groups via NKN blockchain subscriptions, subscriber management with side panel, leave with confirmation dialog, text/image/voice/file messaging, nMobile-compatible topic name hashing
 - **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members from contact list, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
+- **Desktop notifications** — Native OS notifications for incoming messages (1-to-1, topic, private group). Click to navigate to conversation. Suppressed when window is focused and viewing the relevant conversation.
+- **Mute notifications** — Per-conversation mute toggle (bell icon on hover in session list) and global "Mute all notifications" toggle in Settings
 - **Contact name resolution** — Contact names displayed throughout session list and message thread headers
 - **Error boundary** — React error boundary catches rendering crashes and displays error details with retry
 - **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles, inbound messages left-aligned with avatar and surface-colored bubbles, dark theme with three-tone surface hierarchy, Tailwind CSS
@@ -53,7 +55,6 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 ### Coming Soon
 - **Video sharing** — Video media type via IPFS
 - **Burn-after-read** — Self-destructing messages
-- **Desktop notifications** — Native OS notifications for new messages
 
 ## Getting Started
 
@@ -130,7 +131,7 @@ src/
 │   │   └── profile-service.ts      Avatar resize, nickname persistence
 │   ├── db/              SQLite database layer
 │   │   ├── database.ts             Singleton (init/get/close, WAL, FK)
-│   │   ├── migrations/             Version-based schema migrations (001–006)
+│   │   ├── migrations/             Version-based schema migrations (001–007)
 │   │   └── repositories/           One repository per entity (7 repos)
 │   ├── ipc/             IPC handler registration (one file per domain)
 │   └── crypto/
@@ -198,7 +199,7 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 | Seed in memory | Ed25519 keypair cached as `Uint8Array`, zeroed on disconnect. Seed not held as instance field. | Done |
 | Renderer exploitation | Context isolation enabled, nodeIntegration disabled. Renderer has no Node.js access. | Done |
 | Seed exposure to renderer | Seed never crosses IPC boundary. All wallet operations return only address + publicKey. | Done |
-| Settings API access control | Allowlist restricts renderer to safe keys only (`ipfs_config`, `profile_*`). | Done |
+| Settings API access control | Allowlist restricts renderer to safe keys only (`ipfs_config`, `profile_*`, `notifications_muted`). | Done |
 | Metadata leakage | NKN's onion-like routing obscures sender/recipient from relay nodes. | Done |
 
 ### Security Audit (2026-02-21)

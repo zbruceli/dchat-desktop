@@ -251,6 +251,15 @@ app.whenReady().then(() => {
     );
     chatService.setContactProfileService(contactProfileService);
 
+    // Wire up desktop notifications
+    if (mainWindow) {
+      chatService.setMainWindow(mainWindow);
+    }
+    const notifCallback = (title: string, body: string, sessionId: string) =>
+      chatService.showNotification(title, body, sessionId);
+    topicService.setNotificationCallback(notifCallback);
+    privateGroupService.setNotificationCallback(notifCallback);
+
     // Register post-DB IPC handlers
     registerPostDbHandlers({
       chatService,
@@ -262,7 +271,7 @@ app.whenReady().then(() => {
       privateGroupService,
       walletStorage,
       userDataPath,
-    });
+    }, pushToRenderer);
 
     servicesInitialized = true;
   }

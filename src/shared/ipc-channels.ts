@@ -21,7 +21,9 @@ export const IPC = {
     GET_MESSAGES: "chat:getMessages",
     START_SESSION: "chat:startSession",
     MARK_READ: "chat:markRead",
+    SET_ACTIVE_SESSION: "chat:setActiveSession",
     ON_MESSAGE: "chat:onMessage",
+    ON_NAVIGATE_TO_SESSION: "chat:onNavigateToSession",
   },
   CONTACT: {
     ADD: "contact:add",
@@ -53,6 +55,7 @@ export const IPC = {
     LIST: "session:list",
     GET: "session:get",
     DELETE: "session:delete",
+    SET_MUTED: "session:setMuted",
     ON_UPDATE: "session:onUpdate",
     ON_DELETE: "session:onDelete",
   },

@@ -9,6 +9,7 @@ interface SessionRow {
   last_message_content: string;
   last_message_at: number;
   unread_count: number;
+  muted: number;
   created_at: number;
   updated_at: number;
 }
@@ -22,6 +23,7 @@ function rowToSession(row: SessionRow): Session {
     lastMessageContent: row.last_message_content,
     lastMessageAt: row.last_message_at,
     unreadCount: row.unread_count,
+    muted: !!row.muted,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -104,6 +106,12 @@ export class SessionRepository {
     this.db
       .prepare(`UPDATE session SET target_name = ?, updated_at = ? WHERE id = ?`)
       .run(name, Date.now(), id);
+  }
+
+  setMuted(id: string, muted: boolean): void {
+    this.db
+      .prepare(`UPDATE session SET muted = ?, updated_at = ? WHERE id = ?`)
+      .run(muted ? 1 : 0, Date.now(), id);
   }
 
   deleteById(id: string): void {

@@ -57,6 +57,7 @@ export class PrivateGroupService {
   private imageService: ImageService | null = null;
   private audioService: AudioService | null = null;
   private fileService: FileService | null = null;
+  private onNotification: ((title: string, body: string, sessionId: string) => void) | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -67,6 +68,10 @@ export class PrivateGroupService {
     private contactRepo: ContactRepository,
     private pushToRenderer: (channel: string, data: unknown) => void,
   ) {}
+
+  setNotificationCallback(cb: (title: string, body: string, sessionId: string) => void): void {
+    this.onNotification = cb;
+  }
 
   setImageService(imageService: ImageService): void {
     this.imageService = imageService;
@@ -1170,6 +1175,18 @@ export class PrivateGroupService {
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
 
+    // Desktop notification
+    if (this.onNotification) {
+      const notifBody = isAudio || isIpfsAudio
+        ? `${senderName}: Voice Message`
+        : isIpfsFile
+          ? `${senderName}: File`
+          : isIpfs
+            ? `${senderName}: Image`
+            : `${senderName}: ${content}`;
+      this.onNotification(group.name, notifBody, sessionId);
+    }
+
     // Handle inline audio
     if (isAudio && this.audioService && content) {
       const opts = messageData.options ?? {};
@@ -1492,6 +1509,7 @@ export class PrivateGroupService {
       lastMessageContent: "",
       lastMessageAt: now,
       unreadCount: 0,
+      muted: false,
       createdAt: now,
       updatedAt: now,
     });

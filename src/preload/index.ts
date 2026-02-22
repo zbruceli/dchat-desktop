@@ -57,11 +57,19 @@ const api = {
       ipcRenderer.invoke("chat:startSession", targetAddress),
     markRead: (sessionId: string): Promise<void> =>
       ipcRenderer.invoke("chat:markRead", sessionId),
+    setActiveSession: (sessionId: string | null): Promise<void> =>
+      ipcRenderer.invoke("chat:setActiveSession", sessionId),
     onMessage: (callback: (message: Message) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, message: Message) =>
         callback(message);
       ipcRenderer.on("chat:onMessage", handler);
       return () => ipcRenderer.removeListener("chat:onMessage", handler);
+    },
+    onNavigateToSession: (callback: (sessionId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string) =>
+        callback(sessionId);
+      ipcRenderer.on("chat:onNavigateToSession", handler);
+      return () => ipcRenderer.removeListener("chat:onNavigateToSession", handler);
     },
   },
   contact: {
@@ -127,6 +135,8 @@ const api = {
       ipcRenderer.invoke("session:get", id),
     delete: (id: string): Promise<void> =>
       ipcRenderer.invoke("session:delete", id),
+    setMuted: (id: string, muted: boolean): Promise<void> =>
+      ipcRenderer.invoke("session:setMuted", id, muted),
     onUpdate: (callback: (session: Session) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, session: Session) =>
         callback(session);

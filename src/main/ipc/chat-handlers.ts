@@ -95,4 +95,8 @@ export function registerChatHandlers(chatService: ChatService): void {
   ipcMain.handle(IPC.CHAT.MARK_READ, (_event, sessionId: string) => {
     chatService.markSessionRead(sessionId);
   });
+
+  ipcMain.handle(IPC.CHAT.SET_ACTIVE_SESSION, (_event, sessionId: string | null) => {
+    chatService.setActiveSessionId(sessionId);
+  });
 }

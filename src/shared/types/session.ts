@@ -8,6 +8,7 @@ export interface Session {
   lastMessageContent: string;
   lastMessageAt: number;
   unreadCount: number;
+  muted: boolean;
   createdAt: number;
   updatedAt: number;
 }

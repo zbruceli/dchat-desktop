@@ -19,6 +19,11 @@ export function SessionList() {
     );
   }
 
+  async function toggleMute(e: React.MouseEvent, sessionId: string, currentMuted: boolean) {
+    e.stopPropagation();
+    await window.dchat.session.setMuted(sessionId, !currentMuted);
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
       {sessions.map((session) => {
@@ -42,7 +47,7 @@ export function SessionList() {
           <button
             key={session.id}
             onClick={() => setActiveSession(session.id)}
-            className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${
+            className={`group w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors ${
               isActive ? "bg-accent-500/10" : "hover:bg-surface-hover/50"
             }`}
           >
@@ -62,15 +67,41 @@ export function SessionList() {
                 <span className="text-[13px] font-medium text-text-primary truncate">
                   {displayName}
                 </span>
-                <span className="text-[11px] text-text-muted flex-shrink-0 ml-2">{time}</span>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {session.muted && (
+                    <svg className="w-3.5 h-3.5 text-text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                  )}
+                  <span className="text-[11px] text-text-muted">{time}</span>
+                </div>
               </div>
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-xs text-text-muted truncate">{preview}</span>
-                {session.unreadCount > 0 && (
-                  <span className="ml-2 flex-shrink-0 bg-badge text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {session.unreadCount > 99 ? "99+" : session.unreadCount}
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  <span
+                    onClick={(e) => toggleMute(e, session.id, session.muted)}
+                    title={session.muted ? "Unmute notifications" : "Mute notifications"}
+                    className="hidden group-hover:flex w-5 h-5 items-center justify-center rounded hover:bg-surface-border/50 cursor-pointer"
+                  >
+                    {session.muted ? (
+                      <svg className="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                      </svg>
+                    )}
                   </span>
-                )}
+                  {session.unreadCount > 0 && (
+                    <span className="bg-badge text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {session.unreadCount > 99 ? "99+" : session.unreadCount}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </button>

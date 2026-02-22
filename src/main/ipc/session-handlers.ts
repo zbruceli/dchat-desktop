@@ -6,6 +6,7 @@ import type { ChatService } from "../services/chat-service";
 export function registerSessionHandlers(
   sessionService: SessionService,
   chatService: ChatService,
+  pushToRenderer: (channel: string, data: unknown) => void,
 ): void {
   ipcMain.handle(IPC.SESSION.LIST, () => {
     return sessionService.listSessions();
@@ -17,5 +18,12 @@ export function registerSessionHandlers(
 
   ipcMain.handle(IPC.SESSION.DELETE, (_event, id: string) => {
     sessionService.deleteSession(id);
+  });
+
+  ipcMain.handle(IPC.SESSION.SET_MUTED, (_event, id: string, muted: boolean) => {
+    const session = sessionService.setMuted(id, muted);
+    if (session) {
+      pushToRenderer(IPC.SESSION.ON_UPDATE, session);
+    }
   });
 }

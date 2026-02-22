@@ -9,6 +9,7 @@ const ALLOWED_KEYS = new Set([
   "profile_nickname",
   "profile_avatar",
   "profile_version",
+  "notifications_muted",
 ]);
 
 export function registerSettingsHandlers(ipfsService?: IpfsService): void {

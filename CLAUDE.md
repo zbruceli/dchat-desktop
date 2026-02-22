@@ -32,6 +32,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Profile management** — Set/edit nickname and avatar image, resized to 200x200 JPEG via sharp, persisted in settings table, served via `dchat-media://profile-cache/`, displayed in sidebar and Settings page, profile exchange with nMobile contacts (`src/main/services/profile-service.ts`, `src/main/services/contact-profile-service.ts`)
 - **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process, keystore export/import via file dialogs (`src/main/services/wallet-storage-service.ts`)
 - **Database backup & restore** — Export SQLCipher DB as password-encrypted backup via `VACUUM INTO` + `PRAGMA rekey`, restore by rekeying backup to seed-derived key and replacing `dchat.db`, app relaunches after restore (`src/main/ipc/database-handlers.ts`)
+- **Desktop notifications** — Native OS notifications for incoming messages (1-to-1, topic, private group). Suppressed when window is focused and user is viewing the relevant conversation. Click to navigate: focuses window and switches to the conversation. Per-session mute toggle (bell icon on hover in session list) and global "Mute all notifications" toggle in Settings. Uses Electron `Notification` API in main process with active-session tracking via IPC. (`src/main/services/chat-service.ts`)
 - **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group, database (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group, user-profile-panel stores with IPC subscription hooks (`src/renderer/stores/`)
@@ -45,7 +46,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Topic UI** — Join/create topic dialog (`#` button), topic sessions with `#` icon in session list, sender names resolved from contact list or profile nickname for self (falls back to truncated NKN address), member count display (auto-synced with subscriber list), subscriber side panel with refresh from blockchain and clickable rows (opens user profile panel), Leave button with confirmation dialog, image, voice, and file message send/receive in topics (`src/renderer/components/chat/MessageThread.tsx`)
 - **Private group UI** — Create group dialog (lock icon), private group sessions with lock icon in session list, member panel with contact-picker invite/kick/refresh (member sync via `memberRequest`/`memberResponse` protocol), clickable member rows (opens user profile panel with group context), profile nickname for self in member list, member count auto-synced, leave with confirmation dialog, invitation messages with Accept button, join/leave notifications, text/image/voice/file messaging, contact name resolution in session list and headers (`src/renderer/components/chat/PrivateGroupMemberPanel.tsx`)
 - **Contacts UI** — Contact list with add form, chat and delete actions, clickable avatar opens user profile panel (`src/renderer/pages/Contacts/`)
-- **Settings UI** — Profile editing (avatar + nickname), wallet backup (keystore export), database backup & restore (password-encrypted), IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
+- **Settings UI** — Profile editing (avatar + nickname), notification mute toggle, wallet backup (keystore export), database backup & restore (password-encrypted), IPFS gateway configuration (`src/renderer/pages/Settings/SettingsPage.tsx`)
 - **Wallet UI** — Balance display with refresh, send NKN tokens (with address validation, balance check, contact picker with auto client→wallet address conversion), receive section with copyable addresses, txn hash links to nscan.io, echo test (`src/renderer/pages/Wallet/WalletPage.tsx`)
 - **Error boundary** — React ErrorBoundary catches rendering crashes and displays error details with a retry button (`src/renderer/App.tsx`)
 - **Auth gate** — App shows LoginPage when disconnected, main UI when connected (`src/renderer/App.tsx`)
@@ -65,9 +66,9 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - ~~Message receipts~~ (done — delivery receipt on receive, read receipt on conversation open, blue ✓✓ for read)
+- ~~Desktop notifications~~ (done — native OS notifications for all message types, click-to-navigate, suppressed when viewing conversation)
 - Video sharing
 - Media messages in topics (video — images, audio, and file now supported)
-- Desktop notifications
 
 ## Tech Stack
 
@@ -135,7 +136,7 @@ dchat/
 │   │   │   ├── client-handlers.ts   # ✅ client:disconnect/getStatus/echoTest (connect removed — handled by wallet handlers)
 │   │   │   ├── chat-handlers.ts     # ✅ chat:sendMessage/getMessages/sendAudio/downloadAudio/sendFile/downloadFile/openFile
 │   │   │   ├── contact-handlers.ts  # ✅ contact:add/list/get/delete
-│   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete
+│   │   │   ├── session-handlers.ts  # ✅ session:list/get/delete/setMuted
 │   │   │   ├── wallet-handlers.ts   # ✅ wallet:createAndConnect/importAndConnect/restoreAndConnect/autoConnect/logout/transfer/addressFromClient/exportKeystore/importKeystoreFile (seed never leaves main)
 │   │   │   ├── database-handlers.ts # ✅ database:export/restore (password-encrypted SQLCipher backup)
 │   │   │   ├── settings-handlers.ts # ✅ settings:get/set (key-value store)
@@ -160,13 +161,14 @@ dchat/
 │   │   │   ├── database.ts          # ✅ SQLCipher singleton (init with encryption key/get/close, WAL, FK)
 │   │   │   ├── migrate-to-encrypted.ts # ✅ Migrate existing unencrypted DB to SQLCipher via PRAGMA rekey
 │   │   │   ├── migrations/
-│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (6 migrations)
+│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (7 migrations)
 │   │   │   │   ├── 001-initial-schema.ts  # ✅ contact, session, message, settings tables
 │   │   │   │   ├── 002-add-message-options.ts # ✅ options + local_file_path columns on message
 │   │   │   │   ├── 003-add-thumbnail-path.ts  # ✅ thumbnail_local_file_path column on message
 │   │   │   │   ├── 004-add-topic-tables.ts   # ✅ topic + topic_subscriber tables
 │   │   │   │   ├── 005-add-contact-profile-version.ts # ✅ profile_version column on contact
-│   │   │   │   └── 006-add-private-group-tables.ts    # ✅ private_group + private_group_member tables
+│   │   │   │   ├── 006-add-private-group-tables.ts    # ✅ private_group + private_group_member tables
+│   │   │   │   └── 007-add-session-muted.ts           # ✅ muted column on session
 │   │   │   └── repositories/
 │   │   │       ├── message-repository.ts  # ✅ insert, findBySessionId, updateStatus, updateOptions, updateLocalFilePath, updateThumbnailLocalFilePath, updateContentType
 │   │   │       ├── contact-repository.ts  # ✅ upsert, findByAddress, findAll, delete
@@ -502,7 +504,7 @@ Key conventions:
 | Table | Purpose |
 |---|---|
 | `contact` | User contacts with profile data, profile_version (PK: `address`) |
-| `session` | Conversation threads with last message preview and unread count (PK: `id`) |
+| `session` | Conversation threads with last message preview, unread count, and muted flag (PK: `id`) |
 | `message` | All chat messages with content, status, options (JSON), local_file_path, thumbnail_local_file_path (FK → `session`) |
 | `settings` | App configuration key-value pairs (stores wallet keystore, IPFS config, etc.) |
 | `topic` | Public group metadata: joined status, subscribe time, expiry block height, member count (PK: `id`) |
@@ -519,6 +521,7 @@ Migration history:
 - **004**: Add `topic` and `topic_subscriber` tables for group chat
 - **005**: Add `profile_version` (TEXT) column to contact
 - **006**: Add `private_group` and `private_group_member` tables for private groups
+- **007**: Add `muted` (INTEGER, default 0) column to session for per-conversation notification mute
 
 ### Planned (future migrations)
 

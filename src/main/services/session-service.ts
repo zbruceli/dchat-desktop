@@ -12,6 +12,11 @@ export class SessionService {
     return this.sessionRepo.findById(id);
   }
 
+  setMuted(id: string, muted: boolean): Session | undefined {
+    this.sessionRepo.setMuted(id, muted);
+    return this.sessionRepo.findById(id);
+  }
+
   deleteSession(id: string): void {
     this.sessionRepo.deleteById(id);
   }

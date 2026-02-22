@@ -97,6 +97,54 @@ function ProfileSection() {
   );
 }
 
+function NotificationsSection() {
+  const [muted, setMuted] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    window.dchat.settings
+      .get("notifications_muted")
+      .then((value) => {
+        if (value === true) setMuted(true);
+      })
+      .catch(console.error)
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function handleToggle() {
+    const newValue = !muted;
+    setMuted(newValue);
+    await window.dchat.settings.set("notifications_muted", newValue);
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <section className="max-w-lg mb-8">
+      <h2 className="text-sm font-medium text-text-secondary mb-4">Notifications</h2>
+      <label className="flex items-center gap-3 cursor-pointer">
+        <div
+          onClick={handleToggle}
+          className={`relative w-10 h-5 rounded-full transition-colors ${
+            muted ? "bg-red-500/60" : "bg-surface-border"
+          }`}
+        >
+          <div
+            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+              muted ? "translate-x-5" : "translate-x-0.5"
+            }`}
+          />
+        </div>
+        <span className="text-sm text-text-primary">Mute all notifications</span>
+      </label>
+      <p className="text-[11px] text-text-faint mt-2">
+        When enabled, no desktop notifications will be shown for any conversation.
+        You can also mute individual conversations from the session list.
+      </p>
+    </section>
+  );
+}
+
 function WalletBackupSection() {
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -285,6 +333,8 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold text-text-primary mb-6">Settings</h1>
 
       <ProfileSection />
+
+      <NotificationsSection />
 
       <WalletBackupSection />
 
