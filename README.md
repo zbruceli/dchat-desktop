@@ -185,16 +185,17 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 |---|---|---|
 | Server compromise | No server. All messages relay through decentralized NKN nodes. | Done |
 | Message interception | End-to-end encryption (NKN SDK). Relay nodes cannot decrypt messages. | Done |
-| Local data theft | SQLCipher database encryption (AES-256), key derived from wallet seed. | **Not yet implemented** — currently plain SQLite |
-| Key extraction | Wallet seed encrypted via Electron `safeStorage` (OS keychain on macOS/Windows). Falls back to plaintext on Linux if Secret Service unavailable. | Partial |
+| Local data theft | SQLCipher database encryption (AES-256), key derived from wallet seed. | Done |
+| Key extraction | Wallet seed encrypted via Electron `safeStorage` (OS keychain). safeStorage required — no plaintext fallback. `wallet.json` permissions set to `0600`. | Done |
+| Seed in memory | Ed25519 keypair cached as `Uint8Array`, zeroed on disconnect. Seed not held as instance field. | Done |
 | Renderer exploitation | Context isolation enabled, nodeIntegration disabled. Renderer has no Node.js access. | Done |
-| Seed exposure to renderer | Seed currently passed to renderer for connect flow. Should be kept in main process only. | **Not yet fixed** |
-| Settings API access control | Generic settings API allows renderer to read any key including encrypted_seed. Needs allowlist. | **Not yet fixed** |
+| Seed exposure to renderer | Seed never crosses IPC boundary. All wallet operations return only address + publicKey. | Done |
+| Settings API access control | Allowlist restricts renderer to safe keys only (`ipfs_config`, `profile_*`). | Done |
 | Metadata leakage | NKN's onion-like routing obscures sender/recipient from relay nodes. | Done |
 
-### Known Security Issues (Audit 2026-02-21)
+### Security Audit (2026-02-21)
 
-See `SECURITY_AUDIT.md` for the full audit report with file:line references and remediation plan.
+See `SECURITY_AUDIT.md` for the full audit report. All critical, high, and medium issues have been remediated.
 
 ## Roadmap
 

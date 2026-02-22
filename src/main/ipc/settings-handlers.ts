@@ -3,8 +3,19 @@ import { IPC } from "../../shared/ipc-channels";
 import { getDatabase } from "../db/database";
 import type { IpfsService } from "../services/ipfs-service";
 
+/** Settings keys the renderer is allowed to read/write. */
+const ALLOWED_KEYS = new Set([
+  "ipfs_config",
+  "profile_nickname",
+  "profile_avatar",
+  "profile_version",
+]);
+
 export function registerSettingsHandlers(ipfsService?: IpfsService): void {
   ipcMain.handle(IPC.SETTINGS.GET, (_event, key: string) => {
+    if (!ALLOWED_KEYS.has(key)) {
+      throw new Error(`Settings key "${key}" is not accessible`);
+    }
     const db = getDatabase();
     const row = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key) as
       | { value: string | null }
@@ -18,6 +29,9 @@ export function registerSettingsHandlers(ipfsService?: IpfsService): void {
   });
 
   ipcMain.handle(IPC.SETTINGS.SET, (_event, key: string, value: unknown) => {
+    if (!ALLOWED_KEYS.has(key)) {
+      throw new Error(`Settings key "${key}" is not writable`);
+    }
     const db = getDatabase();
     const serialized = JSON.stringify(value);
     db.prepare(

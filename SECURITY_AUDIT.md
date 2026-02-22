@@ -16,7 +16,7 @@ wallet-handlers.ts (main)          ◄── returns { address, publicKey } only
   │ initServices(seed) → DB key = SHA256(seed)
   ▼
 NknClientService (main)
-  │ this.seed = seed                    (held in memory for session lifetime)
+  │ cachedPrivateKey = keyPair(seed)    (Ed25519 keypair cached, seed discarded)
   ▼
 nkn.MultiClient({ seed })
 ```
@@ -64,25 +64,26 @@ nkn.MultiClient({ seed })
 
 **Status:** Mitigated by C3 fix — keystore now stored in encrypted SQLCipher database AND in `wallet.json` (encrypted by safeStorage).
 
-#### H2. Unrestricted settings API
+#### H2. ~~Unrestricted settings API~~ — FIXED
 
-**Files:**
-- `src/main/ipc/settings-handlers.ts:7-18` — `settings:get(key)` accepts any key, no validation
-- `src/preload/index.ts` — renderer can call `window.dchat.settings.get()` with any key
+**Status:** Fixed (2026-02-21)
 
-**Risk:** Compromised renderer or XSS can read sensitive data through the generic API.
+**What was done:**
+- Added `ALLOWED_KEYS` allowlist in `settings-handlers.ts`: `ipfs_config`, `profile_nickname`, `profile_avatar`, `profile_version`
+- `settings:get` and `settings:set` throw errors for keys not in the allowlist
+- Renderer can no longer read legacy `encrypted_seed`, `keystore`, or `wallet_address` rows
 
-**Fix:** Add allowlist of safe keys (`ipfs_config`, `profile_*`). Use dedicated handlers for sensitive data. Seed and keystore are no longer stored in settings table (moved to `wallet.json`), but encrypted_seed/wallet_address rows may still exist in legacy databases.
+#### H3. ~~Seed held in memory for entire session~~ — FIXED
 
-#### H3. Seed held in memory for entire session
+**Status:** Fixed (2026-02-21)
 
-**Files:**
-- `src/main/services/nkn-client-service.ts:9` — `this.seed = seed` as instance field
-- `src/main/services/nkn-client-service.ts:84-86` — public `getSeed()` method returns it
-
-**Risk:** Memory dump exposes seed. No secure zeroing.
-
-**Fix:** Clear `this.seed` after MultiClient is created. Derive keypair from client object instead. Remove `getSeed()`.
+**What was done:**
+- Removed `this.seed` instance field and `getSeed()` method from `NknClientService`
+- Ed25519 keypair cached as `Uint8Array` at connect time, seed discarded from instance state
+- `cachedPrivateKey.fill(0)` zeros the private key buffer on disconnect and on connection failure
+- `getKeyPair()` returns cached keypair instead of re-deriving from seed
+- Removed `loadSeedOnly()` from `WalletStorageService` — transfer handler uses scoped `load()?.seed`
+- Encryption key validated as `/^[0-9a-f]{64}$/` before PRAGMA key/rekey to prevent injection
 
 ### MEDIUM
 
@@ -98,11 +99,13 @@ nkn.MultiClient({ seed })
 
 **Risk:** Preload has full Node.js access. Necessary for current architecture but increases attack surface.
 
-#### M3. No restrictive file permissions on database
+#### M3. ~~No restrictive file permissions on wallet.json~~ — FIXED
 
-**Risk:** DB file inherits OS default umask. On Linux, may be world-readable. Mitigated by SQLCipher encryption.
+**Status:** Fixed (2026-02-21)
 
-**Fix:** Set `0600` on `dchat.db` and `wallet.json` after creation.
+**What was done:**
+- `WalletStorageService.save()` sets `chmod 0o600` on `wallet.json` after writing
+- DB file (`dchat.db`) permissions rely on SQLCipher encryption as primary protection
 
 ## What's Done Right
 
@@ -118,6 +121,10 @@ nkn.MultiClient({ seed })
 - NKN messages are end-to-end encrypted by the SDK
 - IPFS files are AES-128-GCM encrypted before upload
 - Wallet data stored in `wallet.json` with safeStorage encryption
+- Settings API restricted to allowlisted keys only
+- Ed25519 private key cached as `Uint8Array`, zeroed on disconnect
+- `wallet.json` file permissions set to `0600` (owner-only)
+- PRAGMA key/rekey input validated against strict hex format
 
 ## Remediation Plan
 
@@ -126,6 +133,7 @@ nkn.MultiClient({ seed })
 | 1 | Keep seed in main process only | Critical | Medium | **Done** |
 | 2 | Fail instead of plaintext fallback | Critical | Small | **Done** |
 | 3 | Enable SQLCipher | Critical | Medium | **Done** |
-| 4 | Allowlist settings keys | High | Small | Open |
-| 5 | Zero seed in NknClientService after client init | High | Small | Open |
-| 6 | Set `0600` file permissions on database and wallet.json | Medium | Small | Open |
+| 4 | Allowlist settings keys | High | Small | **Done** |
+| 5 | Cache keypair, remove seed from memory, zero on disconnect | High | Small | **Done** |
+| 6 | Set `0600` file permissions on `wallet.json` | Medium | Small | **Done** |
+| 7 | Validate encryption key format before PRAGMA | Medium | Small | **Done** |

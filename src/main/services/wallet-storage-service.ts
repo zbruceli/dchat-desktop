@@ -29,6 +29,8 @@ export class WalletStorageService {
       encryptedSeed: encrypted.toString("base64"),
     };
     fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2), "utf-8");
+    // Restrict file permissions to owner-only (0600)
+    fs.chmodSync(this.filePath, 0o600);
   }
 
   load(): { keystore: string; walletAddress: string; seed: string } | null {
@@ -50,11 +52,6 @@ export class WalletStorageService {
       walletAddress: data.walletAddress,
       seed,
     };
-  }
-
-  loadSeedOnly(): string | null {
-    const result = this.load();
-    return result?.seed ?? null;
   }
 
   hasSavedWallet(): boolean {

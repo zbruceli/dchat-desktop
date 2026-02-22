@@ -10,6 +10,9 @@ export function migrateToEncrypted(
   userDataPath: string,
   encryptionKey: string,
 ): void {
+  if (!/^[0-9a-f]{64}$/.test(encryptionKey)) {
+    throw new Error("Invalid database encryption key format");
+  }
   const dbPath = path.join(userDataPath, "dchat.db");
   if (!fs.existsSync(dbPath)) return;
 

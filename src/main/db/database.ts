@@ -14,6 +14,9 @@ export function initDatabase(
   db = new Database(dbPath);
 
   if (encryptionKey) {
+    if (!/^[0-9a-f]{64}$/.test(encryptionKey)) {
+      throw new Error("Invalid database encryption key format");
+    }
     db.pragma(`key = '${encryptionKey}'`);
   }
 

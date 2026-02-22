@@ -55,7 +55,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - ~~SQLCipher encryption~~ (done — `better-sqlite3-multiple-ciphers` with SHA256(seed) key)
 - ~~Seed isolation~~ (done — seed never leaves main process, `WalletStorageService` + safeStorage)
 - ~~safeStorage plaintext fallback~~ (done — throws error if unavailable)
-- Settings API allowlist (block renderer access to sensitive keys) — see `SECURITY_AUDIT.md`
+- ~~Settings API allowlist~~ (done — renderer restricted to `ipfs_config`, `profile_*` keys)
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - Message receipts (delivered/read status)
@@ -511,9 +511,12 @@ nMobile uses `ParallelQueue` extensively for serialized async execution per key 
 
 ### Security Requirements
 - Private keys never leave the main process; wallet seed encrypted via Electron safeStorage in `wallet.json`, never sent to renderer
-- Database encrypted with SQLCipher (`better-sqlite3-multiple-ciphers`); key = `hex(SHA-256(wallet seed))`
+- Ed25519 private key cached as `Uint8Array` at connect time, zeroed (`fill(0)`) on disconnect — seed not held as instance field
+- Database encrypted with SQLCipher (`better-sqlite3-multiple-ciphers`); key = `hex(SHA-256(wallet seed))`, validated as `/^[0-9a-f]{64}$/` before PRAGMA
 - safeStorage is required — app throws error if OS keychain unavailable (no plaintext fallback)
 - Deferred DB initialization — database only opened after wallet provides the seed
+- Settings API restricted to allowlisted keys (`ipfs_config`, `profile_*`) — renderer cannot read sensitive data
+- `wallet.json` file permissions set to `0600` (owner-only read/write)
 - All NKN messages are end-to-end encrypted by the SDK
 - Files uploaded to IPFS are encrypted with AES-128-GCM (16-byte key, 12-byte nonce) before upload
 - No telemetry or analytics without explicit user consent

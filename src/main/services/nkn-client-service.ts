@@ -6,7 +6,8 @@ import type { ClientStatus } from "../../shared/types";
 export class NknClientService extends EventEmitter {
   private client: nkn.MultiClient | null = null;
   private status: ClientStatus = { state: "disconnected" };
-  private seed: string | undefined;
+  /** Cached Ed25519 keypair — derived once at connect, zeroed on disconnect. */
+  private cachedPrivateKey: Uint8Array | null = null;
 
   getStatus(): ClientStatus {
     return { ...this.status };
@@ -17,10 +18,13 @@ export class NknClientService extends EventEmitter {
       await this.disconnect();
     }
 
-    this.seed = seed;
     this.updateStatus({ state: "connecting" });
 
     try {
+      // Derive and cache Ed25519 keypair before clearing seed from scope
+      const kp = nkn.crypto.keyPair(seed);
+      this.cachedPrivateKey = new Uint8Array(kp.privateKey);
+
       this.client = new nkn.MultiClient({
         seed,
         numSubClients: 4,
@@ -63,7 +67,11 @@ export class NknClientService extends EventEmitter {
     } catch (err) {
       this.updateStatus({ state: "disconnected" });
       this.client = null;
-      this.seed = undefined;
+      // Zero and discard cached private key on failure
+      if (this.cachedPrivateKey) {
+        this.cachedPrivateKey.fill(0);
+        this.cachedPrivateKey = null;
+      }
       throw err;
     }
   }
@@ -77,18 +85,18 @@ export class NknClientService extends EventEmitter {
       }
       this.client = null;
     }
-    this.seed = undefined;
+    // Zero and discard cached private key
+    if (this.cachedPrivateKey) {
+      this.cachedPrivateKey.fill(0);
+      this.cachedPrivateKey = null;
+    }
     this.updateStatus({ state: "disconnected" });
   }
 
-  getSeed(): string | undefined {
-    return this.seed;
-  }
-
+  /** Returns the cached Ed25519 keypair. Private key is zeroed on disconnect. */
   getKeyPair(): { privateKey: Uint8Array } {
-    if (!this.seed) throw new Error("NKN client not connected");
-    const kp = nkn.crypto.keyPair(this.seed);
-    return { privateKey: kp.privateKey };
+    if (!this.cachedPrivateKey) throw new Error("NKN client not connected");
+    return { privateKey: this.cachedPrivateKey };
   }
 
   async sendMessage(dest: string, data: string): Promise<void> {

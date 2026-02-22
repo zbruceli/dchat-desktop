@@ -114,8 +114,9 @@ export function registerWalletHandlers(
       amount: string,
       fee: string,
     ): Promise<{ txnHash: string }> => {
-      const seed = walletStorage.loadSeedOnly();
-      if (!seed) throw new Error("No wallet seed found");
+      const saved = walletStorage.load();
+      if (!saved) throw new Error("No wallet seed found");
+      const seed = saved.seed;
 
       const wallet = new nkn.Wallet({ seed });
 
