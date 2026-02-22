@@ -51,8 +51,10 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Test suite** — 63 unit tests covering crypto, DB migrations, repositories, IPFS service, image service, and chat service
 
 ### What's not yet built
-- SQLCipher encryption (currently plain SQLite — swap `better-sqlite3` for `better-sqlite3-multiple-ciphers`)
-- Electron safeStorage for private key persistence
+- SQLCipher encryption (currently plain SQLite — swap `better-sqlite3` for `better-sqlite3-multiple-ciphers`) — see `SECURITY_AUDIT.md`
+- Seed isolation (keep seed in main process only, never return to renderer) — see `SECURITY_AUDIT.md`
+- Settings API allowlist (block renderer access to `encrypted_seed`, `keystore`) — see `SECURITY_AUDIT.md`
+- safeStorage plaintext fallback removal (fail instead of storing unencrypted on Linux) — see `SECURITY_AUDIT.md`
 - ~~Wallet page UI~~ (done — send/receive NKN tokens with balance display)
 - Message receipts (delivered/read status)
 - Video sharing

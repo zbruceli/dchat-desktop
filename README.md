@@ -182,14 +182,20 @@ Each user's identity is an NKN address derived from their public key (e.g., `a1b
 
 ## Security Model
 
-| Threat | Mitigation |
-|---|---|
-| Server compromise | No server. All messages relay through decentralized NKN nodes. |
-| Message interception | End-to-end encryption (NKN SDK). Relay nodes cannot decrypt messages. |
-| Local data theft | SQLCipher encrypts the entire database (AES-256). Key derived from wallet seed. |
-| Key extraction | Private keys stored via Electron's `safeStorage` (OS keychain). |
-| Renderer exploitation | Context isolation enabled, nodeIntegration disabled. Renderer has no Node.js access. |
-| Metadata leakage | NKN's onion-like routing obscures sender/recipient from relay nodes. |
+| Threat | Mitigation | Status |
+|---|---|---|
+| Server compromise | No server. All messages relay through decentralized NKN nodes. | Done |
+| Message interception | End-to-end encryption (NKN SDK). Relay nodes cannot decrypt messages. | Done |
+| Local data theft | SQLCipher database encryption (AES-256), key derived from wallet seed. | **Not yet implemented** — currently plain SQLite |
+| Key extraction | Wallet seed encrypted via Electron `safeStorage` (OS keychain on macOS/Windows). Falls back to plaintext on Linux if Secret Service unavailable. | Partial |
+| Renderer exploitation | Context isolation enabled, nodeIntegration disabled. Renderer has no Node.js access. | Done |
+| Seed exposure to renderer | Seed currently passed to renderer for connect flow. Should be kept in main process only. | **Not yet fixed** |
+| Settings API access control | Generic settings API allows renderer to read any key including encrypted_seed. Needs allowlist. | **Not yet fixed** |
+| Metadata leakage | NKN's onion-like routing obscures sender/recipient from relay nodes. | Done |
+
+### Known Security Issues (Audit 2026-02-21)
+
+See `SECURITY_AUDIT.md` for the full audit report with file:line references and remediation plan.
 
 ## Roadmap
 
