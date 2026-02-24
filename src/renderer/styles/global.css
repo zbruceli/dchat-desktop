@@ -43,3 +43,64 @@ body {
 ::selection {
   background: rgba(74, 124, 247, 0.3);
 }
+
+/* Rich text (markdown / HTML) in message bubbles */
+.rich-text h1 { font-size: 1.4em; font-weight: 700; margin: 0.4em 0; }
+.rich-text h2 { font-size: 1.2em; font-weight: 700; margin: 0.4em 0; }
+.rich-text h3 { font-size: 1.1em; font-weight: 600; margin: 0.3em 0; }
+.rich-text h4,
+.rich-text h5,
+.rich-text h6 { font-size: 1em; font-weight: 600; margin: 0.3em 0; }
+.rich-text p { margin: 0.3em 0; }
+.rich-text ul,
+.rich-text ol { padding-left: 1.4em; margin: 0.3em 0; }
+.rich-text li { margin: 0.15em 0; }
+.rich-text blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.25);
+  padding-left: 0.7em;
+  margin: 0.4em 0;
+  opacity: 0.85;
+}
+.rich-text code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+.rich-text pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.6em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.4em 0;
+}
+.rich-text pre code {
+  background: none;
+  padding: 0;
+}
+.rich-text img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 0.3em 0;
+}
+.rich-text a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rich-text a:hover {
+  opacity: 0.8;
+}
+.rich-text table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.9em;
+}
+.rich-text th,
+.rich-text td {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.3em 0.6em;
+}
+.rich-text th {
+  font-weight: 600;
+}

@@ -30,7 +30,7 @@ function InviteSection({
   inviting,
   onInvite,
 }: {
-  contacts: { address: string; name?: string }[];
+  contacts: { address: string; name?: string; avatarUri?: string }[];
   members: PrivateGroupMember[];
   myAddress: string | undefined;
   inviting: boolean;
@@ -114,17 +114,25 @@ function InviteSection({
           />
           <div className="mt-1 max-h-40 overflow-y-auto bg-surface-raised border border-surface-border rounded">
             {filtered.length > 0 ? (
-              filtered.map((c) => (
+              filtered.map((c) => {
+                const cAvatarUrl = c.avatarUri
+                  ? `dchat-media://contact-cache/${c.avatarUri}`
+                  : null;
+                return (
                 <button
                   key={c.address}
                   onClick={() => pick(c.address)}
                   className="w-full px-2 py-1.5 text-left hover:bg-surface-hover transition-colors flex items-center gap-2"
                   disabled={inviting}
                 >
-                  <div className="w-5 h-5 rounded bg-surface-hover flex items-center justify-center flex-shrink-0">
-                    <span className="text-[8px] text-text-secondary">
-                      {(c.name || c.address).charAt(0).toUpperCase()}
-                    </span>
+                  <div className="w-5 h-5 rounded bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {cAvatarUrl ? (
+                      <img src={cAvatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[8px] text-text-secondary">
+                        {(c.name || c.address).charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     {c.name && !c.name.endsWith("...") ? (
@@ -137,7 +145,8 @@ function InviteSection({
                     )}
                   </div>
                 </button>
-              ))
+                );
+              })
             ) : search.trim().length > 20 ? (
               <button
                 onClick={() => pick(search.trim())}
@@ -309,6 +318,10 @@ export function PrivateGroupMemberPanel({
           <div className="py-1">
             {activeMembers.map((member) => {
               const group = groups.find((g) => g.groupId === groupId);
+              const memberContact = contacts.find((c) => c.address === member.invitee);
+              const memberAvatarUrl = memberContact?.avatarUri
+                ? `dchat-media://contact-cache/${memberContact.avatarUri}`
+                : null;
               return (
               <div
                 key={member.invitee}
@@ -320,10 +333,14 @@ export function PrivateGroupMemberPanel({
                   targetPermission: member.permission,
                 })}
               >
-                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
-                  <span className="text-[9px] text-text-secondary">
-                    {member.invitee.charAt(0).toUpperCase()}
-                  </span>
+                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {memberAvatarUrl ? (
+                    <img src={memberAvatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-text-secondary">
+                      {member.invitee.charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-text-secondary truncate block" title={member.invitee}>

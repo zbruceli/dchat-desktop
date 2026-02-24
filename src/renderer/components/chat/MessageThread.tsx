@@ -118,22 +118,32 @@ function SubscriberPanel({
           </div>
         ) : (
           <div className="py-1">
-            {subscribers.map((sub) => (
+            {subscribers.map((sub) => {
+              const subContact = contacts.find((c) => c.address === sub.contactAddress);
+              const subAvatarUrl = subContact?.avatarUri
+                ? `dchat-media://contact-cache/${subContact.avatarUri}`
+                : null;
+              return (
               <div
                 key={sub.contactAddress}
                 className="px-3 py-1.5 flex items-center gap-2 hover:bg-surface-hover/50 cursor-pointer"
                 onClick={() => openProfile(sub.contactAddress, { topicName })}
               >
-                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0">
-                  <span className="text-[9px] text-text-secondary">
-                    {sub.contactAddress.charAt(0).toUpperCase()}
-                  </span>
+                <div className="w-6 h-6 rounded-lg bg-surface-hover flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {subAvatarUrl ? (
+                    <img src={subAvatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-text-secondary">
+                      {sub.contactAddress.charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-text-secondary truncate" title={sub.contactAddress}>
                   {getDisplayName(sub.contactAddress)}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -181,9 +191,13 @@ export function MessageThread() {
   const groupId = isPrivateGroup ? session.targetAddress : null;
   const group = groupId ? groups.find((g) => g.groupId === groupId) : null;
   const isDirect = session && !isTopic && !isPrivateGroup;
+  const directContact = isDirect ? contacts.find((c) => c.address === session.targetAddress) : undefined;
   const displayName = (isDirect
-    ? (contacts.find((c) => c.address === session.targetAddress)?.name || session.targetName)
+    ? (directContact?.name || session.targetName)
     : session?.targetName) || "";
+  const headerAvatarUrl = directContact?.avatarUri
+    ? `dchat-media://contact-cache/${directContact.avatarUri}`
+    : null;
 
   // Close panels when switching sessions
   useEffect(() => {
@@ -289,18 +303,22 @@ export function MessageThread() {
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-border">
           <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${
               isTopic ? "bg-accent-700/30" : isPrivateGroup ? "bg-emerald-700/30" : "bg-surface-hover"
             } ${isDirect ? "cursor-pointer hover:opacity-80" : ""}`}
             onClick={isDirect ? () => setShowContactPanel(!showContactPanel) : undefined}
           >
-            <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
-              {isTopic ? "#" : isPrivateGroup ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              ) : displayName.charAt(0).toUpperCase()}
-            </span>
+            {isDirect && headerAvatarUrl ? (
+              <img src={headerAvatarUrl} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
+                {isTopic ? "#" : isPrivateGroup ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                ) : displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div

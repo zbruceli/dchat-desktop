@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import DOMPurify from "dompurify";
 import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
@@ -254,6 +256,77 @@ function formatCountdown(ms: number): string {
   return `${totalSeconds}s`;
 }
 
+/** Detect if content contains HTML tags */
+function containsHtml(text: string): boolean {
+  return /<(?:p|div|span|a|br|h[1-6]|ul|ol|li|blockquote|img|strong|em|b|i|table|tr|td|th)\b/i.test(text);
+}
+
+/** Detect if content contains markdown syntax */
+function containsMarkdown(text: string): boolean {
+  // Check for common markdown patterns: headers, links, bold, italic, lists, blockquotes, code
+  return /(?:^#{1,6}\s|^\s*[-*+]\s|\[.+?\]\(.+?\)|\*\*.+?\*\*|__.+?__|^\s*>|```|`[^`]+`)/m.test(text);
+}
+
+/** Open external links in the system browser */
+function handleRichTextClick(e: React.MouseEvent) {
+  const target = e.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (anchor && anchor.href) {
+    e.preventDefault();
+    window.open(anchor.href, "_blank");
+  }
+}
+
+/** Sanitize HTML and render */
+function HtmlContent({ content, isOutbound }: { content: string; isOutbound: boolean }) {
+  const sanitized = useMemo(() => DOMPurify.sanitize(content, {
+    ALLOWED_TAGS: ["p", "br", "a", "strong", "em", "b", "i", "u", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "code", "pre", "img", "span", "div", "table", "tr", "td", "th", "thead", "tbody"],
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "class"],
+  }), [content]);
+
+  return (
+    <div
+      className={`rich-text text-[15px] leading-relaxed break-words ${isOutbound ? "text-white" : "text-text-primary"}`}
+      onClick={handleRichTextClick}
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+    />
+  );
+}
+
+/** Render markdown content */
+function MarkdownContent({ content, isOutbound }: { content: string; isOutbound: boolean }) {
+  return (
+    <div className={`rich-text text-[15px] leading-relaxed break-words ${isOutbound ? "text-white" : "text-text-primary"}`} onClick={handleRichTextClick}>
+      <ReactMarkdown
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+/** Render text content with markdown/HTML detection */
+function TextContent({ content, isOutbound }: { content: string; isOutbound: boolean }) {
+  const hasHtml = useMemo(() => containsHtml(content), [content]);
+  const hasMd = useMemo(() => containsMarkdown(content), [content]);
+
+  if (hasHtml) return <HtmlContent content={content} isOutbound={isOutbound} />;
+  if (hasMd) return <MarkdownContent content={content} isOutbound={isOutbound} />;
+
+  return (
+    <p className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${isOutbound ? "text-white" : "text-text-primary"}`}>
+      {content}
+    </p>
+  );
+}
+
 function BurnIndicator({ deleteAt }: { deleteAt: number }) {
   const [remaining, setRemaining] = useState(deleteAt - Date.now());
 
@@ -321,17 +394,20 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             ? "\u2717" // x
             : "";
 
+  const senderContact = isOutbound ? undefined : contacts.find((c) => c.address === message.sender);
   const senderName = (() => {
     if (isOutbound) return "You";
-    const contact = contacts.find((c) => c.address === message.sender);
-    return contact?.name && !contact.name.endsWith("...")
-      ? contact.name
+    return senderContact?.name && !senderContact.name.endsWith("...")
+      ? senderContact.name
       : truncateAddress(message.sender);
   })();
 
   const senderKey = isOutbound ? "you" : message.sender;
   const avatarColor = stringToColor(senderKey);
   const avatarInitial = senderName.charAt(0).toUpperCase();
+  const senderAvatarUrl = senderContact?.avatarUri
+    ? `dchat-media://contact-cache/${senderContact.avatarUri}`
+    : null;
 
   const isInvitation = message.contentType === "privateGroup:invitation";
 
@@ -346,9 +422,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
       ) : isIpfsImage ? (
         <ImageContent message={message} />
       ) : (
-        <p className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${isOutbound ? "text-white" : "text-text-primary"}`}>
-          {message.content}
-        </p>
+        <TextContent content={message.content} isOutbound={isOutbound} />
       )}
     </>
   );
@@ -380,10 +454,14 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     <div className="flex justify-start px-5 py-1">
       <div className="flex items-start gap-3 max-w-[70%]">
         <div
-          className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 cursor-pointer hover:opacity-80 ${avatarColor}`}
+          className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 cursor-pointer hover:opacity-80 overflow-hidden ${senderAvatarUrl ? "" : avatarColor}`}
           onClick={() => openProfile(message.sender)}
         >
-          <span className="text-sm text-white font-medium">{avatarInitial}</span>
+          {senderAvatarUrl ? (
+            <img src={senderAvatarUrl} alt={senderName} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-sm text-white font-medium">{avatarInitial}</span>
+          )}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
