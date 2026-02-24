@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { Contact } from "../../../shared/types";
+import { BURN_DURATIONS } from "../../../shared/constants";
 import { useContactStore } from "../../stores/contact-store";
 
 interface ContactEditPanelProps {
@@ -13,7 +14,11 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
   const [name, setName] = useState(contact.name);
   const updateContact = useContactStore((s) => s.updateContact);
   const pickAndSetContactAvatar = useContactStore((s) => s.pickAndSetContactAvatar);
+  const setBurnOptions = useContactStore((s) => s.setBurnOptions);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const burnEnabled = (contact.burnAfterSeconds ?? 0) > 0;
+  const burnSeconds = contact.burnAfterSeconds ?? 60;
 
   useEffect(() => {
     setName(contact.name);
@@ -103,6 +108,39 @@ export function ContactEditPanel({ contact, onClose, onStartChat, onDelete }: Co
           <div className="px-3 py-2 bg-surface-raised/50 border border-surface-border/50 rounded-lg text-text-secondary text-xs font-mono break-all select-all">
             {contact.address}
           </div>
+        </div>
+
+        {/* Burn After Read */}
+        <div>
+          <label className="block text-xs text-text-muted mb-2">Burn After Read</label>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-text-secondary">Self-destruct messages</span>
+            <button
+              onClick={() => setBurnOptions(contact.address, burnEnabled ? 0 : 60)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                burnEnabled ? "bg-orange-500" : "bg-surface-hover"
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                  burnEnabled ? "left-5" : "left-0.5"
+                }`}
+              />
+            </button>
+          </div>
+          {burnEnabled && (
+            <select
+              value={burnSeconds}
+              onChange={(e) => setBurnOptions(contact.address, Number(e.target.value))}
+              className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-orange-500/50"
+            >
+              {BURN_DURATIONS.map((d) => (
+                <option key={d.seconds} value={d.seconds}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Actions */}

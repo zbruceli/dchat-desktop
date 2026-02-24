@@ -180,7 +180,7 @@ describe("Migration runner", () => {
   it("runs all migrations and sets user_version", () => {
     runMigrations(db);
     const version = db.pragma("user_version", { simple: true }) as number;
-    expect(version).toBe(7);
+    expect(version).toBe(9);
   });
 
   it("is idempotent (re-running skips already-applied)", () => {
@@ -188,6 +188,6 @@ describe("Migration runner", () => {
     // Running again should not throw
     expect(() => runMigrations(db)).not.toThrow();
     const version = db.pragma("user_version", { simple: true }) as number;
-    expect(version).toBe(7);
+    expect(version).toBe(9);
   });
 });

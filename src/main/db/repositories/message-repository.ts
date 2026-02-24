@@ -14,6 +14,8 @@ interface MessageRow {
   options: string | null;
   local_file_path: string | null;
   thumbnail_local_file_path: string | null;
+  delete_at: number | null;
+  is_delete: number;
   created_at: number;
   updated_at: number;
 }
@@ -32,6 +34,8 @@ function rowToMessage(row: MessageRow): Message {
     options: row.options ?? undefined,
     localFilePath: row.local_file_path ?? undefined,
     thumbnailLocalFilePath: row.thumbnail_local_file_path ?? undefined,
+    deleteAt: row.delete_at ?? undefined,
+    isDelete: row.is_delete === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -70,7 +74,7 @@ export class MessageRepository {
   findBySessionId(sessionId: string, limit = 100, offset = 0): Message[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM message WHERE session_id = ? ORDER BY created_at ASC LIMIT ? OFFSET ?`,
+        `SELECT * FROM message WHERE session_id = ? AND is_delete = 0 ORDER BY created_at ASC LIMIT ? OFFSET ?`,
       )
       .all(sessionId, limit, offset) as MessageRow[];
     return rows.map(rowToMessage);
@@ -153,6 +157,36 @@ export class MessageRepository {
       )
       .all(sessionId, excludeStatus) as MessageRow[];
     return rows.map(rowToMessage);
+  }
+
+  updateDeleteAt(id: string, deleteAt: number): void {
+    this.db
+      .prepare(`UPDATE message SET delete_at = ?, updated_at = ? WHERE id = ?`)
+      .run(deleteAt, Date.now(), id);
+  }
+
+  markDeleted(id: string): void {
+    this.db
+      .prepare(`UPDATE message SET is_delete = 1, updated_at = ? WHERE id = ?`)
+      .run(Date.now(), id);
+  }
+
+  findExpired(beforeTimestamp: number): Message[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM message WHERE delete_at IS NOT NULL AND delete_at <= ? AND is_delete = 0`,
+      )
+      .all(beforeTimestamp) as MessageRow[];
+    return rows.map(rowToMessage);
+  }
+
+  findLastBySessionId(sessionId: string): Message | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM message WHERE session_id = ? AND is_delete = 0 ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(sessionId) as MessageRow | undefined;
+    return row ? rowToMessage(row) : undefined;
   }
 
   deleteBySessionId(sessionId: string): void {

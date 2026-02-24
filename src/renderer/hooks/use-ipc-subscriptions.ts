@@ -19,6 +19,7 @@ export function useIpcSubscriptions(): void {
   const handleGroupDelete = usePrivateGroupStore((s) => s.handleGroupDelete);
   const setProfile = useProfileStore((s) => s.setProfile);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
+  const handleMessageBurned = useChatStore((s) => s.handleMessageBurned);
 
   useEffect(() => {
     const unsubStatus = window.dchat.client.onStatusChange(setStatus);
@@ -32,6 +33,7 @@ export function useIpcSubscriptions(): void {
     const unsubGroupDel = window.dchat.privateGroup.onDelete(handleGroupDelete);
     const unsubProfile = window.dchat.profile.onUpdate(setProfile);
     const unsubNavigate = window.dchat.chat.onNavigateToSession(setActiveSession);
+    const unsubBurned = window.dchat.chat.onMessageBurned(handleMessageBurned);
 
     return () => {
       unsubStatus();
@@ -45,6 +47,7 @@ export function useIpcSubscriptions(): void {
       unsubGroupDel();
       unsubProfile();
       unsubNavigate();
+      unsubBurned();
     };
-  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession]);
+  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession, handleMessageBurned]);
 }

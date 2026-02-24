@@ -1,8 +1,13 @@
 import { ipcMain, dialog } from "electron";
 import { IPC } from "../../shared/ipc-channels";
 import type { ContactService } from "../services/contact-service";
+import type { ChatService } from "../services/chat-service";
 
-export function registerContactHandlers(contactService: ContactService): void {
+export function registerContactHandlers(
+  contactService: ContactService,
+  chatService?: ChatService,
+  pushToRenderer?: (channel: string, data: unknown) => void,
+): void {
   ipcMain.handle(IPC.CONTACT.ADD, (_event, address: string, name?: string) => {
     return contactService.addContact({ address, name });
   });
@@ -35,5 +40,14 @@ export function registerContactHandlers(contactService: ContactService): void {
 
   ipcMain.handle(IPC.CONTACT.SET_AVATAR, async (_event, address: string, filePath: string) => {
     return contactService.setContactAvatar(address, filePath);
+  });
+
+  ipcMain.handle(IPC.CONTACT.SET_BURN_OPTIONS, (_event, address: string, burnAfterSeconds: number) => {
+    const updated = contactService.setBurnOptions(address, burnAfterSeconds);
+    if (updated && chatService) {
+      chatService.sendBurnOptionsToContact(address, burnAfterSeconds, updated.burnUpdateAt ?? Date.now());
+      if (pushToRenderer) pushToRenderer("contact:onUpdate", updated);
+    }
+    return updated;
   });
 }

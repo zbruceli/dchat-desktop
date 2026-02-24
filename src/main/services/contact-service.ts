@@ -72,6 +72,15 @@ export class ContactService {
     return this.contactRepo.findAll();
   }
 
+  setBurnOptions(address: string, burnAfterSeconds: number): Contact | undefined {
+    const existing = this.contactRepo.findByAddress(address);
+    if (!existing) return undefined;
+
+    const burnUpdateAt = Date.now();
+    this.contactRepo.updateBurnOptions(address, burnAfterSeconds, burnUpdateAt);
+    return this.contactRepo.findByAddress(address);
+  }
+
   deleteContact(address: string): void {
     this.contactRepo.deleteByAddress(address);
   }

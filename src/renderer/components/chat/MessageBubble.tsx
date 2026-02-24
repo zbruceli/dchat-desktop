@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Message, MessageOptions } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
@@ -235,6 +235,47 @@ function ControlMessageContent({ message }: { message: Message }) {
   );
 }
 
+function ContactOptionsContent({ message }: { message: Message }) {
+  return (
+    <div className="text-center py-1">
+      <span className="text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">
+        {message.content}
+      </span>
+    </div>
+  );
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0s";
+  const totalSeconds = Math.ceil(ms / 1000);
+  if (totalSeconds >= 86400) return `${Math.floor(totalSeconds / 86400)}d`;
+  if (totalSeconds >= 3600) return `${Math.floor(totalSeconds / 3600)}h`;
+  if (totalSeconds >= 60) return `${Math.floor(totalSeconds / 60)}m`;
+  return `${totalSeconds}s`;
+}
+
+function BurnIndicator({ deleteAt }: { deleteAt: number }) {
+  const [remaining, setRemaining] = useState(deleteAt - Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRemaining(deleteAt - Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [deleteAt]);
+
+  if (remaining <= 0) return null;
+
+  return (
+    <span className="text-[10px] text-orange-400 flex items-center gap-0.5 min-w-[32px]" title="Burn timer">
+      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      {formatCountdown(remaining)}
+    </span>
+  );
+}
+
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
   const contacts = useContactStore((s) => s.contacts);
@@ -247,6 +288,11 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
 
   if (isControlMessage) {
     return <ControlMessageContent message={message} />;
+  }
+
+  // Contact options (burn setting changes) render as centered notifications
+  if (message.contentType === "contactOptions") {
+    return <ContactOptionsContent message={message} />;
   }
 
   const isAudio = message.contentType === "audio";
@@ -312,7 +358,8 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     return (
       <div className="flex justify-end px-5 py-1">
         <div className="max-w-[70%]">
-          <div className="flex items-baseline justify-end gap-2 mb-0.5">
+          <div className="flex items-center justify-end gap-2 mb-0.5">
+            {message.deleteAt && <BurnIndicator deleteAt={message.deleteAt} />}
             <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : message.status === "read" ? "text-blue-400" : "text-text-faint"}`}>
               {statusIcon}
             </span>
@@ -339,7 +386,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
           <span className="text-sm text-white font-medium">{avatarInitial}</span>
         </div>
         <div className="min-w-0">
-          <div className="flex items-baseline gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5">
             {showSender && (
               <span
                 className="text-[13px] font-semibold text-text-primary cursor-pointer hover:underline"
@@ -349,6 +396,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
               </span>
             )}
             <span className="text-[11px] text-text-muted">{time}</span>
+            {message.deleteAt && <BurnIndicator deleteAt={message.deleteAt} />}
           </div>
           <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2">
             {messageContent}

@@ -14,6 +14,7 @@ interface ContactState {
   deleteContact: (address: string) => Promise<void>;
   updateContact: (address: string, name: string) => Promise<Contact | null>;
   pickAndSetContactAvatar: (address: string) => Promise<Contact | null>;
+  setBurnOptions: (address: string, burnAfterSeconds: number) => Promise<Contact | null>;
   handleContactUpdate: (contact: Contact) => void;
 }
 
@@ -81,6 +82,15 @@ export const useContactStore = create<ContactState>((set) => ({
     const filePath = await window.dchat.contact.pickAvatar();
     if (!filePath) return null;
     const updated = await window.dchat.contact.setAvatar(address, filePath);
+    if (updated) {
+      const contacts = await window.dchat.contact.list();
+      set({ contacts });
+    }
+    return updated;
+  },
+
+  setBurnOptions: async (address: string, burnAfterSeconds: number) => {
+    const updated = await window.dchat.contact.setBurnOptions(address, burnAfterSeconds);
     if (updated) {
       const contacts = await window.dchat.contact.list();
       set({ contacts });

@@ -12,6 +12,7 @@ import type { TopicSubscriber } from "../../../shared/types";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
+import { ContactEditPanel } from "../contact/ContactEditPanel";
 
 function SubscriberPanel({
   topicName,
@@ -164,6 +165,7 @@ export function MessageThread() {
   const [leaving, setLeaving] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showContactPanel, setShowContactPanel] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevSessionRef = useRef<string | null>(null);
@@ -183,9 +185,10 @@ export function MessageThread() {
     ? (contacts.find((c) => c.address === session.targetAddress)?.name || session.targetName)
     : session?.targetName) || "";
 
-  // Close members panel when switching away from a group/topic
+  // Close panels when switching sessions
   useEffect(() => {
     if (!isGroup) setShowMembers(false);
+    setShowContactPanel(false);
   }, [activeSessionId, isGroup]);
 
   // Scroll to bottom: instantly on session switch, smoothly on new messages
@@ -285,9 +288,12 @@ export function MessageThread() {
       <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-surface-base">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-border">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            isTopic ? "bg-accent-700/30" : isPrivateGroup ? "bg-emerald-700/30" : "bg-surface-hover"
-          }`}>
+          <div
+            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              isTopic ? "bg-accent-700/30" : isPrivateGroup ? "bg-emerald-700/30" : "bg-surface-hover"
+            } ${isDirect ? "cursor-pointer hover:opacity-80" : ""}`}
+            onClick={isDirect ? () => setShowContactPanel(!showContactPanel) : undefined}
+          >
             <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
               {isTopic ? "#" : isPrivateGroup ? (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,7 +303,12 @@ export function MessageThread() {
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-bold text-text-primary">{displayName}</div>
+            <div
+              className={`text-[15px] font-bold text-text-primary ${isDirect ? "cursor-pointer hover:underline" : ""}`}
+              onClick={isDirect ? () => setShowContactPanel(!showContactPanel) : undefined}
+            >
+              {displayName}
+            </div>
             {isTopic ? (
               <button
                 onClick={() => setShowMembers(!showMembers)}
@@ -313,11 +324,31 @@ export function MessageThread() {
                 {group?.count ?? 0} members {showMembers ? "\u25B4" : "\u25BE"}
               </button>
             ) : (
-              <div className="text-[11px] text-text-muted truncate max-w-[300px]">
+              <div
+                className="text-[11px] text-text-muted truncate max-w-[300px] cursor-pointer hover:text-text-secondary"
+                onClick={() => setShowContactPanel(!showContactPanel)}
+              >
                 {session.targetAddress}
               </div>
             )}
           </div>
+          {isDirect && (() => {
+            const c = contacts.find((c) => c.address === session.targetAddress);
+            const burnSec = c?.burnAfterSeconds ?? 0;
+            if (burnSec <= 0) return null;
+            const label = burnSec >= 86400 ? `${Math.floor(burnSec / 86400)}d`
+              : burnSec >= 3600 ? `${Math.floor(burnSec / 3600)}h`
+              : burnSec >= 60 ? `${Math.floor(burnSec / 60)}m`
+              : `${burnSec}s`;
+            return (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 text-[11px]" title="Burn after read active">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Burn: {label}
+              </span>
+            );
+          })()}
           {isGroup && (
             <div className="flex items-center gap-2">
               <button
@@ -367,6 +398,20 @@ export function MessageThread() {
           onSendFile={handleSendFile}
         />
       </div>
+
+      {/* Contact panel for direct chats */}
+      {isDirect && showContactPanel && (() => {
+        const contact = contacts.find((c) => c.address === session.targetAddress);
+        if (!contact) return null;
+        return (
+          <ContactEditPanel
+            contact={contact}
+            onClose={() => setShowContactPanel(false)}
+            onStartChat={() => setShowContactPanel(false)}
+            onDelete={() => setShowContactPanel(false)}
+          />
+        );
+      })()}
 
       {/* Subscriber / Member panel */}
       {isTopic && topicName && showMembers && (

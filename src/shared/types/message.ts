@@ -28,6 +28,7 @@ export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed"
 
 export interface MessageOptions {
   deleteAfterSeconds?: number;
+  updateBurnAfterAt?: number;
   profileVersion?: string;
 
   // Full image IPFS (nMobile format)
@@ -82,6 +83,8 @@ export interface Message {
   options?: string; // JSON-serialized MessageOptions
   localFilePath?: string;
   thumbnailLocalFilePath?: string;
+  deleteAt?: number;
+  isDelete?: boolean;
   createdAt: number;
   updatedAt: number;
 }

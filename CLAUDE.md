@@ -8,7 +8,7 @@ nMobile is a Flutter/Dart mobile app. This project reimplements it as an Electro
 
 ## Current Status
 
-Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), Phase 4 NKN wallet, and Phase 5 security hardening are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, wallet support, message receipts, and encrypted-at-rest storage: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history and delivered/read status, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile. The wallet seed never leaves the main process, the database is encrypted with SQLCipher, and safeStorage is required (no plaintext fallback).
+Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topics + private groups), Phase 4 NKN wallet, and Phase 5 security hardening are complete. The app is a functional decentralized messenger with full image, voice, file, group chat, wallet support, message receipts, burn-after-read, and encrypted-at-rest storage: users can create/restore NKN wallets, connect to the network, add contacts, send/receive end-to-end encrypted text, image, voice, and file messages with persistent history and delivered/read status, configure per-contact burn-after-read timers for self-destructing messages, join/leave public topic groups with subscriber management, create/join/leave private groups with Ed25519 signature-based membership, send/receive NKN tokens, and interoperate with nMobile. The wallet seed never leaves the main process, the database is encrypted with SQLCipher, and safeStorage is required (no plaintext fallback).
 
 ### What exists now
 - **NKN client integration** — `nkn-sdk` MultiClient with connect/disconnect/send/sendNoReply/subscribe/unsubscribe/getSubscribers, connection state management (`src/main/services/nkn-client-service.ts`)
@@ -33,6 +33,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Wallet storage** — Wallet keystore + safeStorage-encrypted seed stored in `wallet.json` file, seed never exposed to renderer process, keystore export/import via file dialogs (`src/main/services/wallet-storage-service.ts`)
 - **Database backup & restore** — Export SQLCipher DB as password-encrypted backup via `VACUUM INTO` + `PRAGMA rekey`, restore by rekeying backup to seed-derived key and replacing `dchat.db`, app relaunches after restore (`src/main/ipc/database-handlers.ts`)
 - **Desktop notifications** — Native OS notifications for incoming messages (1-to-1, topic, private group). Suppressed when window is focused and user is viewing the relevant conversation. Click to navigate: focuses window and switches to the conversation. Per-session mute toggle (bell icon on hover in session list) and global "Mute all notifications" toggle in Settings. Uses Electron `Notification` API in main process with active-session tracking via IPC. (`src/main/services/chat-service.ts`)
+- **Burn-after-read** — Per-contact self-destructing messages with configurable durations (5s to 1 week). nMobile-compatible: `contactOptions` wire format for burn setting exchange, `textExtension` content type for burn text, `deleteAfterSeconds` in message options. Timer starts on send/receive, background scheduler checks every 5s, soft-deletes expired messages. Last-write-wins sync for burn setting. Applies to all 1-to-1 message types (text, image, audio, file). UI: toggle + duration picker in contact panel (accessible from chat header), countdown timer on message bubbles, orange burn badge in chat header, session preview cleared on burn. (`src/main/services/chat-service.ts`, `src/renderer/components/contact/ContactEditPanel.tsx`)
 - **IPC handlers** — Full handler set for client, chat, contact, session, wallet, settings, topic, profile, private group, database (`src/main/ipc/`)
 - **Preload bridge** — Typed `window.dchat` API with push-event listeners for real-time updates (`src/preload/index.ts`)
 - **Zustand stores** — Client, chat, contact, session, topic, profile, private group, user-profile-panel stores with IPC subscription hooks (`src/renderer/stores/`)
@@ -56,7 +57,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - **Shared types** — TypeScript interfaces for Message, MessageOptions, Contact, Session, WalletInfo, ClientStatus, Profile (`src/shared/types/`)
 - **Build pipeline** — TypeScript compilation (main + preload) and Vite bundling (renderer), all passing cleanly
 - **Release pipeline** — GitHub Actions workflow builds unsigned binaries for macOS (x64 + arm64), Windows (x64), and Linux (x64) on tag push (`v*.*.*`), publishes to GitHub Releases. Platform package scripts: `package:mac`, `package:win`, `package:linux`. App icon (512x512 PNG with white "D" on dark background) auto-converted to `.icns`/`.ico` by electron-builder. See `RELEASING.md` for full docs. (`.github/workflows/release.yml`, `scripts/generate-icons.mjs`)
-- **Test suite** — 340 unit tests covering crypto (AES-GCM, Ed25519), all 7 DB migrations, all 7 repositories, IPC settings handlers, and 10 services (chat, topic, private-group, file, audio, image, IPFS, session, contact, NKN client)
+- **Test suite** — 340 unit tests covering crypto (AES-GCM, Ed25519), all 9 DB migrations, all 7 repositories, IPC settings handlers, and 10 services (chat, topic, private-group, file, audio, image, IPFS, session, contact, NKN client)
 
 ### What's not yet built
 - ~~SQLCipher encryption~~ (done — `better-sqlite3-multiple-ciphers` with SHA256(seed) key)
@@ -67,6 +68,7 @@ Phase 1 (Foundation), Phase 2 (rich messaging), Phase 3 group chat (public topic
 - ~~Private groups~~ (done — off-chain, signature-based membership with nMobile interop)
 - ~~Message receipts~~ (done — delivery receipt on receive, read receipt on conversation open, blue ✓✓ for read)
 - ~~Desktop notifications~~ (done — native OS notifications for all message types, click-to-navigate, suppressed when viewing conversation)
+- ~~Burn-after-read~~ (done — per-contact self-destructing messages, nMobile-compatible wire format, configurable durations, countdown UI)
 - Video sharing
 - Media messages in topics (video — images, audio, and file now supported)
 
@@ -161,14 +163,16 @@ dchat/
 │   │   │   ├── database.ts          # ✅ SQLCipher singleton (init with encryption key/get/close, WAL, FK)
 │   │   │   ├── migrate-to-encrypted.ts # ✅ Migrate existing unencrypted DB to SQLCipher via PRAGMA rekey
 │   │   │   ├── migrations/
-│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (7 migrations)
+│   │   │   │   ├── migration-runner.ts    # ✅ Version-based migration executor (9 migrations)
 │   │   │   │   ├── 001-initial-schema.ts  # ✅ contact, session, message, settings tables
 │   │   │   │   ├── 002-add-message-options.ts # ✅ options + local_file_path columns on message
 │   │   │   │   ├── 003-add-thumbnail-path.ts  # ✅ thumbnail_local_file_path column on message
 │   │   │   │   ├── 004-add-topic-tables.ts   # ✅ topic + topic_subscriber tables
 │   │   │   │   ├── 005-add-contact-profile-version.ts # ✅ profile_version column on contact
 │   │   │   │   ├── 006-add-private-group-tables.ts    # ✅ private_group + private_group_member tables
-│   │   │   │   └── 007-add-session-muted.ts           # ✅ muted column on session
+│   │   │   │   ├── 007-add-session-muted.ts           # ✅ muted column on session
+│   │   │   ├── 008-add-contact-burn-options.ts    # ✅ burn_after_seconds, burn_update_at on contact
+│   │   │   └── 009-add-message-burn-columns.ts    # ✅ delete_at, is_delete on message
 │   │   │   └── repositories/
 │   │   │       ├── message-repository.ts  # ✅ insert, findBySessionId, updateStatus, updateOptions, updateLocalFilePath, updateThumbnailLocalFilePath, updateContentType
 │   │   │       ├── contact-repository.ts  # ✅ upsert, findByAddress, findAll, delete
@@ -326,7 +330,7 @@ Security: contextIsolation is enabled, nodeIntegration is disabled. The renderer
 6. **Message Status** — Sending → Sent → Delivered → Read receipts **Implemented.**
 7. **Media Messages** — Image, audio, video, file sharing
 8. **IPFS Integration** — Encrypted file upload/download for large media
-9. **Burn-after-read** — Self-destructing messages with configurable timers
+9. **Burn-after-read** — Self-destructing messages with configurable timers **Implemented.**
 10. **Erasure Coding** — Split large payloads into redundant pieces for reliable delivery
 
 ### Phase 3: Group Chat
@@ -507,20 +511,20 @@ Key conventions:
 
 ## Database Schema
 
-### Implemented (migrations 001–006)
+### Implemented (migrations 001–009)
 
 | Table | Purpose |
 |---|---|
-| `contact` | User contacts with profile data, profile_version (PK: `address`) |
+| `contact` | User contacts with profile data, profile_version, burn_after_seconds, burn_update_at (PK: `address`) |
 | `session` | Conversation threads with last message preview, unread count, and muted flag (PK: `id`) |
-| `message` | All chat messages with content, status, options (JSON), local_file_path, thumbnail_local_file_path (FK → `session`) |
+| `message` | All chat messages with content, status, options (JSON), local_file_path, thumbnail_local_file_path, delete_at, is_delete (FK → `session`) |
 | `settings` | App configuration key-value pairs (stores wallet keystore, IPFS config, etc.) |
 | `topic` | Public group metadata: joined status, subscribe time, expiry block height, member count (PK: `id`) |
 | `topic_subscriber` | Cached subscriber list per topic (PK: `topic_id, contact_address`) |
 | `private_group` | Private group metadata: name, type, joined status, version, signature, member count (PK: `group_id`) |
 | `private_group_member` | Private group members with Ed25519 dual-signatures, permissions, expiry (PK: `group_id, invitee`) |
 
-Indexes: `idx_session_last_message_at`, `idx_message_session_id`, `idx_message_nkn_message_id`, `idx_topic_subscriber_topic_id`, `idx_pgm_group_id`
+Indexes: `idx_session_last_message_at`, `idx_message_session_id`, `idx_message_nkn_message_id`, `idx_message_delete_at`, `idx_topic_subscriber_topic_id`, `idx_pgm_group_id`
 
 Migration history:
 - **001**: Initial schema — contact, session, message, settings tables
@@ -530,6 +534,8 @@ Migration history:
 - **005**: Add `profile_version` (TEXT) column to contact
 - **006**: Add `private_group` and `private_group_member` tables for private groups
 - **007**: Add `muted` (INTEGER, default 0) column to session for per-conversation notification mute
+- **008**: Add `burn_after_seconds` (INTEGER, default 0) and `burn_update_at` (INTEGER, default 0) columns to contact
+- **009**: Add `delete_at` (INTEGER) and `is_delete` (INTEGER, default 0) columns to message, with partial index on `delete_at`
 
 ### Planned (future migrations)
 

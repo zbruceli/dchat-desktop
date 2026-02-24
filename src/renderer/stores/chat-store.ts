@@ -22,6 +22,7 @@ interface ChatState {
   openFile: (localFilePath: string) => Promise<void>;
   startSession: (targetAddress: string) => Promise<string>;
   handleIncomingMessage: (message: Message) => void;
+  handleMessageBurned: (data: { messageId: string; sessionId: string }) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -184,6 +185,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesBySession: {
           ...state.messagesBySession,
           [message.sessionId]: updatedMessages,
+        },
+      };
+    });
+  },
+
+  handleMessageBurned: (data: { messageId: string; sessionId: string }) => {
+    set((state) => {
+      const sessionMessages = state.messagesBySession[data.sessionId];
+      if (!sessionMessages) return state;
+      return {
+        messagesBySession: {
+          ...state.messagesBySession,
+          [data.sessionId]: sessionMessages.filter((m) => m.id !== data.messageId),
         },
       };
     });

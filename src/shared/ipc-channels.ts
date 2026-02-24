@@ -24,6 +24,7 @@ export const IPC = {
     SET_ACTIVE_SESSION: "chat:setActiveSession",
     ON_MESSAGE: "chat:onMessage",
     ON_NAVIGATE_TO_SESSION: "chat:onNavigateToSession",
+    ON_MESSAGE_BURNED: "chat:onMessageBurned",
   },
   CONTACT: {
     ADD: "contact:add",
@@ -34,6 +35,7 @@ export const IPC = {
     PICK_AVATAR: "contact:pickAvatar",
     SET_AVATAR: "contact:setAvatar",
     ON_UPDATE: "contact:onUpdate",
+    SET_BURN_OPTIONS: "contact:setBurnOptions",
   },
   WALLET: {
     CREATE_AND_CONNECT: "wallet:createAndConnect",

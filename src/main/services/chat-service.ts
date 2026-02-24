@@ -42,6 +42,7 @@ export class ChatService {
   private contactProfileService: ContactProfileService | null = null;
   private mainWindow: BrowserWindow | null = null;
   private activeSessionId: string | null = null;
+  private burnSchedulerTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -54,6 +55,7 @@ export class ChatService {
       this.handleIncomingMessage(src, payload);
     });
     this.consolidateLegacySessions();
+    this.startBurnScheduler();
   }
 
   /** Merge duplicate sessions that share the same target_address into one. */
@@ -128,6 +130,87 @@ export class ChatService {
     this.activeSessionId = sessionId;
   }
 
+  startBurnScheduler(): void {
+    if (this.burnSchedulerTimer) return;
+    this.burnSchedulerTimer = setInterval(() => {
+      try {
+        const expired = this.messageRepo.findExpired(Date.now());
+        const affectedSessions = new Set<string>();
+        for (const msg of expired) {
+          this.messageRepo.markDeleted(msg.id);
+          affectedSessions.add(msg.sessionId);
+          this.pushToRenderer("chat:onMessageBurned", {
+            messageId: msg.id,
+            sessionId: msg.sessionId,
+          });
+        }
+        // Clear session preview for affected sessions
+        for (const sessionId of affectedSessions) {
+          this.sessionRepo.updateLastMessage(sessionId, "", Date.now());
+          this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(sessionId));
+        }
+      } catch (err) {
+        console.error("Burn scheduler error:", err);
+      }
+    }, 5000);
+  }
+
+  stopBurnScheduler(): void {
+    if (this.burnSchedulerTimer) {
+      clearInterval(this.burnSchedulerTimer);
+      this.burnSchedulerTimer = null;
+    }
+  }
+
+  sendBurnOptionsToContact(address: string, burnAfterSeconds: number, burnUpdateAt: number): void {
+    const myAddress = this.nknClient.getStatus().address;
+    if (!myAddress) return;
+
+    const messageData = {
+      id: crypto.randomUUID(),
+      contentType: "contactOptions",
+      content: JSON.stringify({
+        optionType: "0",
+        deleteAfterSeconds: burnAfterSeconds,
+        updateBurnAfterAt: burnUpdateAt,
+      }),
+      timestamp: Date.now(),
+    };
+    this.nknClient.sendMessageNoReply(address, JSON.stringify(messageData));
+
+    // Insert system message for display
+    const session = this.getOrCreateSession(address, myAddress);
+    const burnLabel = burnAfterSeconds > 0
+      ? this.formatBurnDuration(burnAfterSeconds)
+      : "";
+    const systemContent = burnAfterSeconds > 0
+      ? `You enabled burn after reading (${burnLabel})`
+      : "You disabled burn after reading";
+
+    const systemMsg: Message = {
+      id: crypto.randomUUID(),
+      sessionId: session.id,
+      sender: myAddress,
+      receiver: address,
+      contentType: "contactOptions",
+      content: systemContent,
+      status: "sent",
+      isOutbound: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.messageRepo.insert(systemMsg);
+    this.pushToRenderer("chat:onMessage", systemMsg);
+  }
+
+  private formatBurnDuration(seconds: number): string {
+    if (seconds >= 604800) return `${Math.floor(seconds / 604800)}w`;
+    if (seconds >= 86400) return `${Math.floor(seconds / 86400)}d`;
+    if (seconds >= 3600) return `${Math.floor(seconds / 3600)}h`;
+    if (seconds >= 60) return `${Math.floor(seconds / 60)}m`;
+    return `${seconds}s`;
+  }
+
   /**
    * Show a desktop notification for an incoming message.
    * Suppressed when the window is focused AND the user is viewing the relevant session,
@@ -186,6 +269,11 @@ export class ChatService {
     const session = this.getOrCreateSession(to, myAddress);
     const messageId = crypto.randomUUID();
 
+    // Check burn setting
+    const contact = this.contactRepo.findByAddress(to);
+    const burnAfterSeconds = contact?.burnAfterSeconds ?? 0;
+    const deleteAt = burnAfterSeconds > 0 ? now + burnAfterSeconds * 1000 : undefined;
+
     // Insert placeholder message
     const message: Message = {
       id: messageId,
@@ -196,11 +284,13 @@ export class ChatService {
       content: "",
       status: "sending",
       isOutbound: true,
+      deleteAt,
       createdAt: now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
+    if (deleteAt) this.messageRepo.updateDeleteAt(messageId, deleteAt);
     this.sessionRepo.updateLastMessage(session.id, "[Image]", now);
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
@@ -209,6 +299,12 @@ export class ChatService {
     try {
       const { options, localFilePath, thumbnailLocalFilePath } =
         await this.imageService.processAndUpload(filePath);
+
+      // Attach burn options
+      if (burnAfterSeconds > 0) {
+        options.deleteAfterSeconds = burnAfterSeconds;
+        options.updateBurnAfterAt = contact?.burnUpdateAt;
+      }
 
       // Update message with IPFS hash as content (nMobile convention)
       const ipfsHash = options.ipfsHash ?? "";
@@ -269,6 +365,11 @@ export class ChatService {
     const session = this.getOrCreateSession(to, myAddress);
     const messageId = crypto.randomUUID();
 
+    // Check burn setting
+    const contact = this.contactRepo.findByAddress(to);
+    const burnAfterSeconds = contact?.burnAfterSeconds ?? 0;
+    const deleteAt = burnAfterSeconds > 0 ? now + burnAfterSeconds * 1000 : undefined;
+
     // Insert placeholder message
     const message: Message = {
       id: messageId,
@@ -279,11 +380,13 @@ export class ChatService {
       content: "",
       status: "sending",
       isOutbound: true,
+      deleteAt,
       createdAt: now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
+    if (deleteAt) this.messageRepo.updateDeleteAt(messageId, deleteAt);
     this.sessionRepo.updateLastMessage(session.id, "[Voice Message]", now);
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
@@ -307,6 +410,10 @@ export class ChatService {
       const profileVersion = this.contactProfileService?.getMyProfileVersion();
       const audioOptions = { ...result.options };
       if (profileVersion) audioOptions.profileVersion = profileVersion;
+      if (burnAfterSeconds > 0) {
+        audioOptions.deleteAfterSeconds = burnAfterSeconds;
+        audioOptions.updateBurnAfterAt = contact?.burnUpdateAt;
+      }
 
       const messageData: MessageData = {
         id: messageId,
@@ -341,6 +448,11 @@ export class ChatService {
     const session = this.getOrCreateSession(to, myAddress);
     const messageId = crypto.randomUUID();
 
+    // Check burn setting
+    const contact = this.contactRepo.findByAddress(to);
+    const burnAfterSeconds = contact?.burnAfterSeconds ?? 0;
+    const deleteAt = burnAfterSeconds > 0 ? now + burnAfterSeconds * 1000 : undefined;
+
     const message: Message = {
       id: messageId,
       sessionId: session.id,
@@ -350,11 +462,13 @@ export class ChatService {
       content: "",
       status: "sending",
       isOutbound: true,
+      deleteAt,
       createdAt: now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
+    if (deleteAt) this.messageRepo.updateDeleteAt(messageId, deleteAt);
     this.sessionRepo.updateLastMessage(session.id, "[File]", now);
     this.pushToRenderer("chat:onMessage", message);
     this.pushToRenderer("session:onUpdate", this.sessionRepo.findById(session.id));
@@ -375,6 +489,10 @@ export class ChatService {
       const profileVersion = this.contactProfileService?.getMyProfileVersion();
       const fileOptions = { ...result.options };
       if (profileVersion) fileOptions.profileVersion = profileVersion;
+      if (burnAfterSeconds > 0) {
+        fileOptions.deleteAfterSeconds = burnAfterSeconds;
+        fileOptions.updateBurnAfterAt = contact?.burnUpdateAt;
+      }
 
       const messageData: MessageData = {
         id: messageId,
@@ -405,29 +523,49 @@ export class ChatService {
 
     const session = this.getOrCreateSession(params.to, myAddress);
 
+    // Check burn setting for this contact
+    const contact = this.contactRepo.findByAddress(params.to);
+    const burnAfterSeconds = contact?.burnAfterSeconds ?? 0;
+
     const profileVersion = this.contactProfileService?.getMyProfileVersion();
+    const options: MessageOptions = {};
+    if (profileVersion) options.profileVersion = profileVersion;
+
+    let contentType = params.contentType ?? "text";
+
+    if (burnAfterSeconds > 0) {
+      // Use textExtension for burn text messages (nMobile convention)
+      if (contentType === "text") contentType = "textExtension";
+      options.deleteAfterSeconds = burnAfterSeconds;
+      options.updateBurnAfterAt = contact?.burnUpdateAt;
+    }
+
     const messageData: MessageData = {
       id: crypto.randomUUID(),
-      contentType: params.contentType ?? "text",
+      contentType,
       content: params.content,
-      options: profileVersion ? { profileVersion } : undefined,
+      options: Object.keys(options).length > 0 ? options : undefined,
       timestamp: now,
     };
+
+    const deleteAt = burnAfterSeconds > 0 ? now + burnAfterSeconds * 1000 : undefined;
 
     const message: Message = {
       id: messageData.id,
       sessionId: session.id,
       sender: myAddress,
       receiver: params.to,
-      contentType: messageData.contentType,
+      contentType,
       content: params.content,
       status: "sending",
       isOutbound: true,
+      deleteAt,
       createdAt: now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
+    if (deleteAt) this.messageRepo.updateDeleteAt(message.id, deleteAt);
     this.sessionRepo.updateLastMessage(session.id, params.content, now);
 
     this.pushToRenderer("chat:onMessage", message);
@@ -500,6 +638,12 @@ export class ChatService {
     // Route contact profile exchange messages
     if (contentType === "contact" && this.contactProfileService) {
       this.contactProfileService.handleContactMessage(src, messageData);
+      return;
+    }
+
+    // Handle contactOptions (burn-after-read settings from remote)
+    if (contentType === "contactOptions") {
+      this.handleContactOptions(src, raw);
       return;
     }
 
@@ -584,6 +728,23 @@ export class ChatService {
           ? "[Image]"
           : content;
 
+    // Compute deleteAt for burn-after-read messages (1-to-1 only)
+    const deleteAfterSeconds = messageData.options?.deleteAfterSeconds;
+    const deleteAt = deleteAfterSeconds && deleteAfterSeconds > 0
+      ? now + deleteAfterSeconds * 1000
+      : undefined;
+
+    // Sync burn setting from incoming message options
+    if (deleteAfterSeconds !== undefined) {
+      const incomingBurnAt = messageData.options?.updateBurnAfterAt ?? 0;
+      const existingContact = this.contactRepo.findByAddress(src);
+      if (existingContact && (existingContact.burnUpdateAt ?? 0) < incomingBurnAt) {
+        this.contactRepo.updateBurnOptions(src, deleteAfterSeconds, incomingBurnAt);
+        const updatedContact = this.contactRepo.findByAddress(src);
+        if (updatedContact) this.pushToRenderer("contact:onUpdate", updatedContact);
+      }
+    }
+
     const message: Message = {
       id: messageData.id,
       sessionId: session.id,
@@ -594,11 +755,13 @@ export class ChatService {
       status: "delivered",
       isOutbound: false,
       options: optionsJson,
+      deleteAt,
       createdAt: messageData.timestamp ?? now,
       updatedAt: now,
     };
 
     this.messageRepo.insert(message);
+    if (deleteAt) this.messageRepo.updateDeleteAt(message.id, deleteAt);
     this.sessionRepo.updateLastMessage(
       session.id,
       sessionPreview,
@@ -673,6 +836,63 @@ export class ChatService {
         // IPFS image download (thumbnail first, then full)
         this.downloadIpfsThumbnailThenFull(message, opts);
       }
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private handleContactOptions(src: string, raw: any): void {
+    try {
+      let contentObj = raw.content;
+      if (typeof contentObj === "string") {
+        contentObj = JSON.parse(contentObj);
+      }
+
+      const optionType = contentObj?.optionType ?? raw.optionType;
+      if (optionType !== "0" && optionType !== 0) return;
+
+      const deleteAfterSeconds = contentObj?.deleteAfterSeconds ?? 0;
+      const updateBurnAfterAt = contentObj?.updateBurnAfterAt ?? 0;
+
+      // Last-write-wins: only apply if incoming is newer
+      const existing = this.contactRepo.findByAddress(src);
+      if (existing && (existing.burnUpdateAt ?? 0) >= updateBurnAfterAt) return;
+
+      this.contactRepo.updateBurnOptions(src, deleteAfterSeconds, updateBurnAfterAt);
+      const updated = this.contactRepo.findByAddress(src);
+      if (updated) {
+        this.pushToRenderer("contact:onUpdate", updated);
+      }
+
+      // Insert system message for UI display
+      const myAddress = this.nknClient.getStatus().address;
+      if (!myAddress) return;
+
+      const session = this.getOrCreateSession(src, myAddress);
+      const contact = this.contactRepo.findByAddress(src);
+      const displayName = contact?.name ?? src.substring(0, 8) + "...";
+      const burnLabel = deleteAfterSeconds > 0
+        ? this.formatBurnDuration(deleteAfterSeconds)
+        : "";
+      const systemContent = deleteAfterSeconds > 0
+        ? `${displayName} enabled burn after reading (${burnLabel})`
+        : `${displayName} disabled burn after reading`;
+
+      const systemMsg: Message = {
+        id: crypto.randomUUID(),
+        sessionId: session.id,
+        sender: src,
+        receiver: myAddress,
+        contentType: "contactOptions",
+        content: systemContent,
+        status: "delivered",
+        isOutbound: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      this.messageRepo.insert(systemMsg);
+      this.pushToRenderer("chat:onMessage", systemMsg);
+    } catch (err) {
+      console.error("Failed to handle contactOptions:", err);
     }
   }
 

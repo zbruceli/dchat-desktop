@@ -3,6 +3,8 @@ export interface Contact {
   name: string;
   avatarUri?: string;
   profileVersion?: string;
+  burnAfterSeconds?: number;
+  burnUpdateAt?: number;
   createdAt: number;
   updatedAt: number;
 }

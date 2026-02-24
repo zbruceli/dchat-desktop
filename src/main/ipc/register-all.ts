@@ -44,7 +44,7 @@ export function registerPostDbHandlers(
   pushToRenderer: (channel: string, data: unknown) => void,
 ): void {
   registerChatHandlers(params.chatService);
-  registerContactHandlers(params.contactService);
+  registerContactHandlers(params.contactService, params.chatService, pushToRenderer);
   registerSessionHandlers(params.sessionService, params.chatService, pushToRenderer);
   registerSettingsHandlers(params.ipfsService);
   if (params.topicService) {

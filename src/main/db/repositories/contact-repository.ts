@@ -6,6 +6,8 @@ interface ContactRow {
   name: string;
   avatar_uri: string | null;
   profile_version: string | null;
+  burn_after_seconds: number | null;
+  burn_update_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -16,6 +18,8 @@ function rowToContact(row: ContactRow): Contact {
     name: row.name,
     avatarUri: row.avatar_uri ?? undefined,
     profileVersion: row.profile_version ?? undefined,
+    burnAfterSeconds: row.burn_after_seconds ?? undefined,
+    burnUpdateAt: row.burn_update_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -31,12 +35,14 @@ export class ContactRepository {
   upsert(contact: Contact): void {
     this.db
       .prepare(
-        `INSERT INTO contact (address, name, avatar_uri, profile_version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO contact (address, name, avatar_uri, profile_version, burn_after_seconds, burn_update_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(address) DO UPDATE SET
            name = excluded.name,
            avatar_uri = excluded.avatar_uri,
            profile_version = excluded.profile_version,
+           burn_after_seconds = excluded.burn_after_seconds,
+           burn_update_at = excluded.burn_update_at,
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -44,6 +50,8 @@ export class ContactRepository {
         contact.name,
         contact.avatarUri ?? null,
         contact.profileVersion ?? null,
+        contact.burnAfterSeconds ?? 0,
+        contact.burnUpdateAt ?? 0,
         contact.createdAt,
         contact.updatedAt,
       );
@@ -69,6 +77,14 @@ export class ContactRepository {
       .prepare(`SELECT * FROM contact ORDER BY name ASC, address ASC`)
       .all() as ContactRow[];
     return rows.map(rowToContact);
+  }
+
+  updateBurnOptions(address: string, burnAfterSeconds: number, burnUpdateAt: number): void {
+    this.db
+      .prepare(
+        `UPDATE contact SET burn_after_seconds = ?, burn_update_at = ?, updated_at = ? WHERE address = ?`,
+      )
+      .run(burnAfterSeconds, burnUpdateAt, Date.now(), address);
   }
 
   deleteByAddress(address: string): void {

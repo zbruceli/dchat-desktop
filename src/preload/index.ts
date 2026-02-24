@@ -71,6 +71,12 @@ const api = {
       ipcRenderer.on("chat:onNavigateToSession", handler);
       return () => ipcRenderer.removeListener("chat:onNavigateToSession", handler);
     },
+    onMessageBurned: (callback: (data: { messageId: string; sessionId: string }) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { messageId: string; sessionId: string }) =>
+        callback(data);
+      ipcRenderer.on("chat:onMessageBurned", handler);
+      return () => ipcRenderer.removeListener("chat:onMessageBurned", handler);
+    },
   },
   contact: {
     add: (address: string, name?: string): Promise<Contact> =>
@@ -87,6 +93,8 @@ const api = {
       ipcRenderer.invoke("contact:pickAvatar"),
     setAvatar: (address: string, filePath: string): Promise<Contact | null> =>
       ipcRenderer.invoke("contact:setAvatar", address, filePath),
+    setBurnOptions: (address: string, burnAfterSeconds: number): Promise<Contact | null> =>
+      ipcRenderer.invoke("contact:setBurnOptions", address, burnAfterSeconds),
     onUpdate: (callback: (contact: Contact) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, contact: Contact) =>
         callback(contact);
