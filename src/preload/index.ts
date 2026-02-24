@@ -9,6 +9,7 @@ import type {
   Profile,
   PrivateGroup,
   PrivateGroupMember,
+  DiscoveredGroup,
 } from "../shared/types";
 
 const api = {
@@ -254,6 +255,20 @@ const api = {
         callback(groupId);
       ipcRenderer.on("privateGroup:onDelete", handler);
       return () => ipcRenderer.removeListener("privateGroup:onDelete", handler);
+    },
+  },
+  discovery: {
+    list: (): Promise<DiscoveredGroup[]> =>
+      ipcRenderer.invoke("discovery:list"),
+    getCategories: (): Promise<string[]> =>
+      ipcRenderer.invoke("discovery:getCategories"),
+    refresh: (): Promise<DiscoveredGroup[]> =>
+      ipcRenderer.invoke("discovery:refresh"),
+    onUpdate: (callback: (groups: DiscoveredGroup[]) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, groups: DiscoveredGroup[]) =>
+        callback(groups);
+      ipcRenderer.on("discovery:onUpdate", handler);
+      return () => ipcRenderer.removeListener("discovery:onUpdate", handler);
     },
   },
 };

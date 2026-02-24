@@ -16,19 +16,9 @@ import type {
 import type { ImageService } from "./image-service";
 import type { AudioService } from "./audio-service";
 import type { FileService } from "./file-service";
+import { genTopicHash } from "../utils/topic-hash";
 
-const TOPIC_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
-
-/**
- * Generate the NKN topic hash from a human-readable topic name.
- * nMobile convention: strip leading '#' chars, SHA-1 hash, hex-encode, prefix with "dchat".
- * e.g. "d-chat" → "dchat" + hex(sha1("d-chat"))
- */
-function genTopicHash(topicName: string): string {
-  const cleaned = topicName.replace(/^#+/, "");
-  const hash = crypto.createHash("sha1").update(cleaned).digest("hex");
-  return "dchat" + hash;
-}
+const TOPIC_NAME_REGEX = /^[\p{L}\p{N}_-]{1,64}$/u;
 
 export class TopicService {
   private imageService: ImageService | null = null;

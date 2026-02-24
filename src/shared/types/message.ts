@@ -22,7 +22,8 @@ export type MessageContentType =
   | "privateGroup:optionResponse"
   | "privateGroup:memberRequest"
   | "privateGroup:memberResponse"
-  | "read";
+  | "read"
+  | "discovery:broadcast";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 

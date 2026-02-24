@@ -8,6 +8,7 @@ import { registerTopicHandlers } from "./topic-handlers";
 import { registerProfileHandlers } from "./profile-handlers";
 import { registerPrivateGroupHandlers } from "./private-group-handlers";
 import { registerDatabaseHandlers } from "./database-handlers";
+import { registerDiscoveryHandlers } from "./discovery-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
 import type { ChatService } from "../services/chat-service";
@@ -17,6 +18,8 @@ import type { IpfsService } from "../services/ipfs-service";
 import type { TopicService } from "../services/topic-service";
 import type { ProfileService } from "../services/profile-service";
 import type { PrivateGroupService } from "../services/private-group-service";
+import type { DiscoveryService } from "../services/discovery-service";
+import type { TopicRepository } from "../db/repositories/topic-repository";
 
 export function registerPreDbHandlers(
   nknClient: NknClientService,
@@ -35,6 +38,8 @@ export interface PostDbHandlersParams {
   topicService?: TopicService;
   profileService: ProfileService;
   privateGroupService?: PrivateGroupService;
+  discoveryService?: DiscoveryService;
+  topicRepo?: TopicRepository;
   walletStorage: WalletStorageService;
   userDataPath: string;
 }
@@ -54,5 +59,8 @@ export function registerPostDbHandlers(
     registerPrivateGroupHandlers(params.privateGroupService);
   }
   registerProfileHandlers(params.profileService);
+  if (params.discoveryService && params.topicRepo) {
+    registerDiscoveryHandlers(params.discoveryService, params.topicRepo);
+  }
   registerDatabaseHandlers(params.walletStorage, params.userDataPath);
 }

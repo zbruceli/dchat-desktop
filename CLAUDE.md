@@ -26,12 +26,13 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - Rich text — Auto-detect and render markdown/HTML (react-markdown + DOMPurify)
 
 ### Group Chat
-- **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers
+- **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported
 - **Private groups** — Off-chain Ed25519 dual-signature membership, owner/admin/member permissions, invite/kick/leave, member sync protocol
+- **Public group discovery** — P2P discovery via shared `publicGroups` NKN topic, 10-min broadcast interval, blockchain subscriber count verification, 7-day stale cleanup, seed groups (d-chat, nkn, general, nMobile, nkn-chat, 中文), Discover tab with search/category filters
 
 ### Identity & Security
 - NKN wallet — Create/import/export keystore, send/receive NKN tokens
-- SQLCipher database — AES-256, key = `hex(SHA256(seed))`, WAL mode, 9 versioned migrations
+- SQLCipher database — AES-256, key = `hex(SHA256(seed))`, WAL mode, 10 versioned migrations
 - safeStorage — Wallet seed encrypted via OS keychain, no plaintext fallback, `wallet.json` permissions `0600`
 - Context isolation — nodeIntegration disabled, seed never crosses IPC to renderer
 - Profile — Nickname + avatar (200x200 JPEG via sharp), exchanged with nMobile contacts
@@ -41,6 +42,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - Desktop notifications (native OS, click-to-navigate, per-session + global mute)
 - Contact edit panel with burn-after-read toggle (accessible from chat header)
 - User profile panel — View any user from avatar/subscriber/member clicks
+- Discover page — Browse/search/filter public groups by category, join with one click
 - Login page — Create/import/restore wallet
 - Settings — Profile, notification mute, wallet backup, DB backup/restore, IPFS gateway config
 - Dark theme with three-tone surface hierarchy, custom Tailwind tokens
@@ -70,11 +72,14 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 src/
 ├── main/                          # Electron main process
 │   ├── index.ts                   # App entry, deferred DB init, protocol handler
+│   ├── utils/
+│   │   └── topic-hash.ts          # genTopicHash utility (shared by topic + discovery)
 │   ├── services/                  # Business logic (mirrors nMobile common/)
 │   │   ├── nkn-client-service.ts  # NKN MultiClient wrapper
 │   │   ├── chat-service.ts        # Message orchestration, burn scheduler, receipts, routing
 │   │   ├── topic-service.ts       # Topic join/leave, subscriber sync, group messaging
 │   │   ├── private-group-service.ts # Private group lifecycle, Ed25519 signatures
+│   │   ├── discovery-service.ts   # Public group discovery via P2P broadcast
 │   │   ├── image-service.ts       # Resize, thumbnail, AES-GCM encrypt, IPFS
 │   │   ├── audio-service.ts       # WebM→AAC conversion, inline/IPFS
 │   │   ├── file-service.ts        # File encrypt, IPFS upload/download
@@ -86,16 +91,16 @@ src/
 │   │   └── wallet-storage-service.ts  # wallet.json + safeStorage
 │   ├── db/
 │   │   ├── database.ts            # SQLCipher singleton (WAL, FK)
-│   │   ├── migrations/            # 9 versioned migrations (001–009)
-│   │   └── repositories/          # 7 repos: message, contact, session, topic, topic_subscriber, private_group, private_group_member
+│   │   ├── migrations/            # 10 versioned migrations (001–010)
+│   │   └── repositories/          # 8 repos: message, contact, session, topic, topic_subscriber, private_group, private_group_member, discovered_group
 │   ├── ipc/                       # IPC handlers (one file per domain)
 │   └── crypto/
 │       ├── aes-gcm.ts             # AES-128-GCM (nMobile-compatible)
 │       └── ed25519-signature.ts   # Ed25519 sign/verify, group version
 ├── renderer/                      # React app (sandboxed)
 │   ├── App.tsx                    # Auth gate + sidebar nav + routing
-│   ├── stores/                    # Zustand: client, chat, contact, session, topic, private-group, profile, nav, user-profile-panel
-│   ├── pages/                     # Login, Chat, Contacts, Wallet, Settings
+│   ├── stores/                    # Zustand: client, chat, contact, session, topic, private-group, profile, nav, user-profile-panel, discovery
+│   ├── pages/                     # Login, Chat, Contacts, Discover, Wallet, Settings
 │   ├── components/
 │   │   ├── chat/                  # SessionList, MessageThread, MessageBubble, MessageInput, AudioContent, FileContent, VoiceRecordButton, ImageModal, PrivateGroupMemberPanel
 │   │   ├── common/                # ConnectionStatus, CopyableField, UserProfilePanel
@@ -103,7 +108,7 @@ src/
 │   ├── hooks/                     # use-ipc-subscriptions (push events)
 │   └── styles/global.css          # Tailwind + rich-text styles
 ├── shared/                        # Shared between main and renderer
-│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client
+│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client, Discovery
 │   ├── constants.ts               # App constants, burn durations, NKN seed servers
 │   └── ipc-channels.ts            # Typed IPC channel definitions
 ├── preload/index.ts               # contextBridge → typed window.dchat API
@@ -123,7 +128,7 @@ npm run package:win  # Windows (NSIS + portable)
 npm run package:linux # Linux (AppImage + DEB)
 ```
 
-## Database Schema (9 migrations)
+## Database Schema (10 migrations)
 
 | Table | Key Columns |
 |---|---|
@@ -135,6 +140,7 @@ npm run package:linux # Linux (AppImage + DEB)
 | `topic_subscriber` | topic_id + contact_address (PK) |
 | `private_group` | group_id (PK), name, type, joined, version, signature, count, data |
 | `private_group_member` | group_id + invitee (PK), inviter, permission, invitee_signature, inviter_signature, expires_at |
+| `discovered_group` | topic_name (PK), description, category, subscriber_count, reported_by, last_reported_at, last_verified_at |
 
 ## NKN Wire Format (nMobile-compatible)
 
@@ -163,6 +169,7 @@ interface MessageData {
 | `topic:subscribe` / `topic:unsubscribe` | Topic join/leave |
 | `privateGroup:invitation` / `accept` / `subscribe` / `quit` | Private group lifecycle |
 | `privateGroup:optionRequest` / `optionResponse` / `memberRequest` / `memberResponse` | Group sync |
+| `discovery:broadcast` | P2P public group discovery broadcast |
 
 ### IPFS Encryption
 - AES-128-GCM: 16-byte key, 12-byte nonce prepended to ciphertext

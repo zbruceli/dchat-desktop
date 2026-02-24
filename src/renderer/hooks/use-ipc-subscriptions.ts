@@ -6,6 +6,7 @@ import { useSessionStore } from "../stores/session-store";
 import { useTopicStore } from "../stores/topic-store";
 import { usePrivateGroupStore } from "../stores/private-group-store";
 import { useProfileStore } from "../stores/profile-store";
+import { useDiscoveryStore } from "../stores/discovery-store";
 
 export function useIpcSubscriptions(): void {
   const setStatus = useClientStore((s) => s.setStatus);
@@ -20,6 +21,7 @@ export function useIpcSubscriptions(): void {
   const setProfile = useProfileStore((s) => s.setProfile);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
   const handleMessageBurned = useChatStore((s) => s.handleMessageBurned);
+  const handleDiscoveryUpdate = useDiscoveryStore((s) => s.handleDiscoveryUpdate);
 
   useEffect(() => {
     const unsubStatus = window.dchat.client.onStatusChange(setStatus);
@@ -34,6 +36,7 @@ export function useIpcSubscriptions(): void {
     const unsubProfile = window.dchat.profile.onUpdate(setProfile);
     const unsubNavigate = window.dchat.chat.onNavigateToSession(setActiveSession);
     const unsubBurned = window.dchat.chat.onMessageBurned(handleMessageBurned);
+    const unsubDiscovery = window.dchat.discovery.onUpdate(handleDiscoveryUpdate);
 
     return () => {
       unsubStatus();
@@ -48,6 +51,7 @@ export function useIpcSubscriptions(): void {
       unsubProfile();
       unsubNavigate();
       unsubBurned();
+      unsubDiscovery();
     };
-  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession, handleMessageBurned]);
+  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession, handleMessageBurned, handleDiscoveryUpdate]);
 }

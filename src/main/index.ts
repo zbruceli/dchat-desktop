@@ -24,6 +24,8 @@ import { TopicRepository } from "./db/repositories/topic-repository";
 import { TopicSubscriberRepository } from "./db/repositories/topic-subscriber-repository";
 import { PrivateGroupRepository } from "./db/repositories/private-group-repository";
 import { PrivateGroupMemberRepository } from "./db/repositories/private-group-member-repository";
+import { DiscoveredGroupRepository } from "./db/repositories/discovered-group-repository";
+import { DiscoveryService } from "./services/discovery-service";
 import {
   registerPreDbHandlers,
   registerPostDbHandlers,
@@ -175,6 +177,7 @@ app.whenReady().then(() => {
     const subscriberRepo = new TopicSubscriberRepository(db);
     const privateGroupRepo = new PrivateGroupRepository(db);
     const privateGroupMemberRepo = new PrivateGroupMemberRepository(db);
+    const discoveredGroupRepo = new DiscoveredGroupRepository(db);
 
     // Create IPFS + media services
     const ipfsService = new IpfsService();
@@ -251,6 +254,16 @@ app.whenReady().then(() => {
     );
     chatService.setContactProfileService(contactProfileService);
 
+    // Discovery service
+    const discoveryService = new DiscoveryService(
+      nknClient,
+      topicRepo,
+      subscriberRepo,
+      discoveredGroupRepo,
+      pushToRenderer,
+    );
+    chatService.setDiscoveryService(discoveryService);
+
     // Wire up desktop notifications
     if (mainWindow) {
       chatService.setMainWindow(mainWindow);
@@ -269,9 +282,16 @@ app.whenReady().then(() => {
       topicService,
       profileService,
       privateGroupService,
+      discoveryService,
+      topicRepo,
       walletStorage,
       userDataPath,
     }, pushToRenderer);
+
+    // Start discovery service (after IPC handlers are registered)
+    discoveryService.start().catch((err) =>
+      console.error("[Main] Failed to start discovery service:", err),
+    );
 
     servicesInitialized = true;
   }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type NavItem = "chat" | "contacts" | "wallet" | "settings";
+type NavItem = "chat" | "contacts" | "discover" | "wallet" | "settings";
 
 interface NavState {
   activeNav: NavItem;

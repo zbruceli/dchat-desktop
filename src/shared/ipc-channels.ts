@@ -108,4 +108,10 @@ export const IPC = {
     ON_UPDATE: "privateGroup:onUpdate",
     ON_DELETE: "privateGroup:onDelete",
   },
+  DISCOVERY: {
+    LIST: "discovery:list",
+    GET_CATEGORIES: "discovery:getCategories",
+    REFRESH: "discovery:refresh",
+    ON_UPDATE: "discovery:onUpdate",
+  },
 } as const;

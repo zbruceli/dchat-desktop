@@ -26,3 +26,5 @@ export type {
 export { PrivateGroupItemPerm } from "./private-group";
 
 export type { Profile } from "./profile";
+
+export type { DiscoveredGroup, DiscoveryBroadcastMessage } from "./discovery";

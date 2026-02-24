@@ -37,6 +37,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 ### Group Chat
 - [x] **Public topics** — NKN blockchain-based subscriptions, subscriber panel, text/image/voice/file messaging
 - [x] **Private groups** — Off-chain Ed25519 signature-based membership, owner/admin/member permissions, invite/kick/leave, full member sync
+- [x] **Public group discovery** — Decentralized P2P discovery via shared NKN topic, browse/search/filter groups, subscriber counts from blockchain, one-click join
 
 ### Identity & Contacts
 - [x] **NKN wallet** — Create, import (keystore/seed), send/receive NKN tokens, balance display
@@ -54,6 +55,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - [x] **Desktop notifications** — Native OS notifications, click to navigate, suppressed when viewing conversation
 - [x] **Mute notifications** — Per-conversation toggle + global mute in Settings
 - [x] **Connection status** — Green/yellow/red indicator with avatar
+- [x] **Discover tab** — Browse public groups with category filters, search, and subscriber counts
 - [x] **Settings** — Profile editing, wallet backup, database backup/restore, IPFS gateway config
 - [x] **nMobile interop** — Full compatibility with nMobile wire formats
 
@@ -143,7 +145,7 @@ See `SECURITY_AUDIT.md` for the full audit report.
 | 3 | Group chat — Public topics, private groups | Complete |
 | 4 | Wallet & polish — NKN wallet, notifications, profile sync | Complete |
 | 5 | Security hardening — SQLCipher, safeStorage, audit | Complete |
-| 6 | Video, multi-device sync, ETH wallet, name service | Planned |
+| 6 | Audio-video call, multi-device sync, name service | Planned |
 
 ## Acknowledgments
 

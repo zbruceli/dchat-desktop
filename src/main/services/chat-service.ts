@@ -8,6 +8,7 @@ import type { TopicService } from "./topic-service";
 import type { PrivateGroupService } from "./private-group-service";
 import { PRIVATE_GROUP_CONTROL_TYPES } from "./private-group-service";
 import type { ContactProfileService } from "./contact-profile-service";
+import type { DiscoveryService } from "./discovery-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
@@ -17,6 +18,7 @@ import type {
   MessageData,
   MessageOptions,
   SendMessageParams,
+  DiscoveryBroadcastMessage,
 } from "../../shared/types";
 
 // Content types that represent user-visible messages
@@ -40,6 +42,7 @@ export class ChatService {
   private topicService: TopicService | null = null;
   private privateGroupService: PrivateGroupService | null = null;
   private contactProfileService: ContactProfileService | null = null;
+  private discoveryService: DiscoveryService | null = null;
   private mainWindow: BrowserWindow | null = null;
   private activeSessionId: string | null = null;
   private burnSchedulerTimer: ReturnType<typeof setInterval> | null = null;
@@ -120,6 +123,10 @@ export class ChatService {
 
   setContactProfileService(service: ContactProfileService): void {
     this.contactProfileService = service;
+  }
+
+  setDiscoveryService(service: DiscoveryService): void {
+    this.discoveryService = service;
   }
 
   setMainWindow(win: BrowserWindow): void {
@@ -618,6 +625,12 @@ export class ChatService {
       if (DISPLAYABLE_TYPES.has(contentType)) {
         this.privateGroupService.handleIncomingGroupMessage(src, messageData);
       }
+      return;
+    }
+
+    // Route discovery broadcasts
+    if (contentType === "discovery:broadcast" && this.discoveryService) {
+      this.discoveryService.handleIncomingBroadcast(src, raw as DiscoveryBroadcastMessage);
       return;
     }
 
