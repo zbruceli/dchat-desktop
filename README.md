@@ -25,195 +25,125 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 
 ## Features
 
-### Available Now
-- **NKN wallet management** — Create new wallet, import from keystore JSON, restore saved wallet
-- **1-to-1 messaging** — Send/receive encrypted text messages over NKN relay network
-- **Image messaging** — Send/receive images encrypted with AES-128-GCM, stored on IPFS, fully interoperable with nMobile
-- **Voice messaging** — Record voice messages (0.5s–60s), WebM/Opus converted to AAC-ADTS for nMobile compatibility, inline play/pause with progress bar
-- **File sharing** — Send/receive any file type (up to 100 MB) encrypted via IPFS, click to open with system default app, nMobile-compatible
-- **IPFS integration** — Encrypted upload/download via nMobile's IPFS nodes, multi-gateway fallback, configurable in Settings
-- **Thumbnail preview** — 120x120 thumbnails uploaded separately to IPFS; receiver sees thumbnail immediately while full image downloads in background
-- **Image viewer** — Click images to open full-screen lightbox, retry failed downloads
-- **Contact management** — Add contacts by NKN address, auto-create contacts for unknown senders
-- **Conversation threads** — Session list with last message preview and unread badges
-- **Message receipts** — Delivered (gray ✓✓) and read (blue ✓✓) status on outbound messages, automatic delivery receipt on receive, read receipt on conversation open, nMobile-interoperable
-- **Encrypted local storage** — SQLCipher database (AES-256) keyed to wallet seed; wallet data stored in `wallet.json` with safeStorage encryption
-- **Connection management** — Connect/disconnect with status indicator (green/yellow/red)
-- **Auth gate** — Login page when disconnected, full app when connected
-- **Profile management** — Set nickname and avatar image, displayed in sidebar and Settings page, persisted across sessions
-- **NKN wallet** — View balance, send NKN tokens to any address (with contact picker and auto client→wallet address conversion), receive section with copyable addresses, transaction links to [nscan.io](https://nscan.io)
-- **Settings page** — Profile editing (nickname + avatar), notification mute toggle, and IPFS gateway configuration
-- **Public topics (group chat)** — Create/join public topic groups via NKN blockchain subscriptions, subscriber management with side panel, leave with confirmation dialog, text/image/voice/file messaging, nMobile-compatible topic name hashing
-- **Private groups** — Off-chain, signature-based membership groups with Ed25519 dual-signatures (inviter + invitee). Create groups, invite members from contact list, accept invitations, leave/kick with confirmation dialogs, member panel with permission badges (Owner/Admin/Normal), full member sync protocol, text/image/voice/file messaging, nMobile-interoperable
-- **Desktop notifications** — Native OS notifications for incoming messages (1-to-1, topic, private group). Click to navigate to conversation. Suppressed when window is focused and viewing the relevant conversation.
-- **Mute notifications** — Per-conversation mute toggle (bell icon on hover in session list) and global "Mute all notifications" toggle in Settings
-- **Contact name resolution** — Contact names displayed throughout session list and message thread headers
-- **Error boundary** — React error boundary catches rendering crashes and displays error details with retry
-- **Chat bubble UI** — Outbound messages right-aligned with accent-colored bubbles, inbound messages left-aligned with avatar and surface-colored bubbles, dark theme with three-tone surface hierarchy, Tailwind CSS
-- Hot-reload development environment
+### Messaging
+- [x] **1-to-1 encrypted messaging** — Text messages over NKN relay with delivery/read receipts (gray ✓✓ / blue ✓✓)
+- [x] **Image messaging** — AES-128-GCM encrypted, IPFS-stored, thumbnail preview, full-screen lightbox
+- [x] **Voice messaging** — Record 0.5s–60s, WebM→AAC conversion, inline player with progress bar
+- [x] **File sharing** — Any file type up to 100 MB, encrypted via IPFS, open with system default app
+- [x] **Burn-after-read** — Per-contact self-destructing messages (5s to 1 week), countdown timer on bubbles, nMobile-compatible
+- [x] **Rich text** — Automatic markdown and HTML rendering with styled headings, blockquotes, code blocks, links
+- [ ] **Video sharing** — Video media type via IPFS
 
-### Coming Soon
-- **Video sharing** — Video media type via IPFS
-- **Burn-after-read** — Self-destructing messages
+### Group Chat
+- [x] **Public topics** — NKN blockchain-based subscriptions, subscriber panel, text/image/voice/file messaging
+- [x] **Private groups** — Off-chain Ed25519 signature-based membership, owner/admin/member permissions, invite/kick/leave, full member sync
+
+### Identity & Contacts
+- [x] **NKN wallet** — Create, import (keystore/seed), send/receive NKN tokens, balance display
+- [x] **Contact management** — Add by NKN address, auto-create for unknown senders, avatar photos displayed throughout UI
+- [x] **Profile** — Nickname + avatar, exchanged with nMobile contacts
+- [x] **User profile panel** — View any user's profile from message avatar, subscriber list, or member list
+
+### Security
+- [x] **SQLCipher encryption** — AES-256, keyed to wallet seed
+- [x] **safeStorage** — Wallet seed encrypted via OS keychain, no plaintext fallback
+- [x] **Context isolation** — nodeIntegration disabled, renderer has no Node.js access
+- [x] **Seed isolation** — Wallet seed never crosses IPC boundary to renderer
+
+### Desktop Experience
+- [x] **Desktop notifications** — Native OS notifications, click to navigate, suppressed when viewing conversation
+- [x] **Mute notifications** — Per-conversation toggle + global mute in Settings
+- [x] **Connection status** — Green/yellow/red indicator with avatar
+- [x] **Settings** — Profile editing, wallet backup, database backup/restore, IPFS gateway config
+- [x] **nMobile interop** — Full compatibility with nMobile wire formats
 
 ## Getting Started
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18 or later
-- npm (included with Node.js)
 
 ### Install and Run
 
 ```bash
-# Clone the repository
-git clone <repo-url> dchat
-cd dchat
-
-# Install dependencies
+git clone <repo-url> dchat && cd dchat
 npm install
-
-# Rebuild native modules (better-sqlite3-multiple-ciphers, sharp) for Electron
 npx electron-rebuild -f -w better-sqlite3-multiple-ciphers
 npx electron-rebuild -f -w sharp
-
-# Start in development mode (hot reload)
 npm run dev
 ```
 
-The app will open an Electron window. On first launch you'll see the Login page — create a new wallet with a password to connect to the NKN network.
+On first launch, create a new wallet with a password to connect to the NKN network.
 
 ### Build for Production
 
 ```bash
-# Full production build
-npm run build
-
-# Package as distributable (dmg/nsis/AppImage)
-npm run package
+npm run build          # Full production build
+npm run package        # Package as distributable (dmg/nsis/AppImage)
+npm run package:mac    # macOS only
+npm run package:win    # Windows only
+npm run package:linux  # Linux only
 ```
 
 ## Development
 
-### Scripts
-
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev mode — Vite hot reload + Electron |
+| `npm run dev` | Vite hot reload + Electron |
 | `npm run build` | Production build (main + preload + renderer) |
-| `npm run package` | Build and package with electron-builder |
-| `npm run package:mac` | Package for macOS (DMG + ZIP) |
-| `npm run package:win` | Package for Windows (NSIS + portable) |
-| `npm run package:linux` | Package for Linux (AppImage + DEB) |
-| `npm run test` | Run unit tests with Vitest |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run lint` | Check code with ESLint |
-| `npm run lint:fix` | Auto-fix lint issues |
+| `npm run test` | Unit tests (Vitest) |
 | `npm run typecheck` | TypeScript type checking |
-
-### Project Structure
-
-```
-src/
-├── main/              Electron main process
-│   ├── index.ts         App entry — DB init, services, IPC registration
-│   ├── services/        Business logic
-│   │   ├── nkn-client-service.ts   NKN MultiClient wrapper
-│   │   ├── chat-service.ts         Send/receive orchestration, topic + private group routing
-│   │   ├── topic-service.ts        Topic join/leave, subscriber sync, group messaging
-│   │   ├── private-group-service.ts Private group lifecycle, member sync, Ed25519 signatures
-│   │   ├── image-service.ts        Image resize, thumbnail, encrypt, IPFS upload/download
-│   │   ├── audio-service.ts        WebM→AAC conversion, inline base64 encoding, IPFS audio
-│   │   ├── file-service.ts         Generic file encrypt, IPFS upload/download, cache
-│   │   ├── ipfs-service.ts         IPFS HTTP API upload/download, multi-gateway
-│   │   ├── contact-service.ts      Contact CRUD
-│   │   ├── session-service.ts      Session CRUD
-│   │   └── profile-service.ts      Avatar resize, nickname persistence
-│   ├── db/              SQLite database layer
-│   │   ├── database.ts             Singleton (init/get/close, WAL, FK)
-│   │   ├── migrations/             Version-based schema migrations (001–007)
-│   │   └── repositories/           One repository per entity (7 repos)
-│   ├── ipc/             IPC handler registration (one file per domain)
-│   └── crypto/
-│       ├── aes-gcm.ts             AES-128-GCM encrypt/decrypt (nMobile-compatible)
-│       └── ed25519-signature.ts   Ed25519 sign/verify, group version generation
-├── renderer/          React UI (runs in browser context)
-│   ├── App.tsx          Auth gate + sidebar nav + page routing
-│   ├── pages/           Login, Chat (two-panel), Contacts, Wallet, Settings
-│   ├── components/      Flat message rows, image display, lightbox, file display, session list, member panels
-│   ├── stores/          Zustand stores (client, chat, contact, session, topic, private-group, profile)
-│   └── hooks/           IPC push-event subscriptions
-├── shared/            Code shared between main and renderer
-│   ├── types/           TypeScript interfaces (Message, Contact, Session, Topic, PrivateGroup, etc.)
-│   ├── constants.ts     App constants, NKN seed servers
-│   └── ipc-channels.ts  IPC channel definitions + push channels
-└── preload/           Electron preload (contextBridge)
-    └── index.ts         Typed window.dchat API with push listeners
-```
+| `npm run lint` | ESLint check |
 
 ### Architecture
 
-D-Chat follows Electron's recommended security model with strict process separation:
-
-- **Main process** handles all privileged operations: NKN networking, database access, cryptography, and file I/O.
-- **Renderer process** is a sandboxed React app with no direct access to Node.js APIs.
-- **Preload script** bridges the two via `contextBridge`, exposing a typed `window.dchat` API.
-
-Context isolation is enabled and `nodeIntegration` is disabled — the renderer communicates with the main process exclusively through IPC.
+```
+┌─────────────────────────────────────────────────┐
+│  Renderer (React + Zustand)                     │
+│  UI components, stores — no Node.js access      │
+├──────────── contextBridge (IPC) ────────────────┤
+│  Main Process                                   │
+│  NKN client, SQLCipher DB, crypto, file I/O     │
+└─────────────────────────────────────────────────┘
+```
 
 ### Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Desktop runtime | Electron |
-| UI | React, TypeScript, Tailwind CSS |
-| State management | Zustand |
+| Desktop runtime | Electron 33 |
+| UI | React 18, TypeScript, Tailwind CSS 3 |
+| State management | Zustand 4 |
 | Networking | nkn-sdk (NKN JavaScript SDK) |
-| Database | better-sqlite3 (SQLCipher planned) |
-| Crypto | Node.js crypto (AES-128-GCM, nMobile-compatible) |
-| Image Processing | sharp (resize, thumbnail generation) |
-| Audio Processing | fluent-ffmpeg + @ffmpeg-installer/ffmpeg (WebM→AAC) |
-| Bundler | Vite (renderer), tsc (main/preload) |
-| Packaging | electron-builder |
-| Testing | Vitest, Playwright |
-
-## NKN Network
-
-[NKN](https://nkn.org/) (New Kind of Network) is a decentralized data relay network with ~100,000 nodes worldwide. Key properties:
-
-- **No central server** — Messages are routed through multiple relay nodes; no single node sees the full path or content.
-- **End-to-end encryption** — Built into the NKN SDK. Messages are encrypted with the recipient's public key before leaving the sender's device.
-- **Censorship resistant** — No single point of failure or control. The network is permissionless.
-- **Blockchain-backed** — NKN uses its own blockchain for node incentives and pub/sub topic subscriptions.
-
-Each user's identity is an NKN address derived from their public key (e.g., `a1b2c3...`). Contacts are added by exchanging these addresses.
+| Database | better-sqlite3-multiple-ciphers (SQLCipher) |
+| Crypto | Node.js crypto (AES-128-GCM), Ed25519 (libsodium) |
+| Media | sharp, fluent-ffmpeg, react-markdown, DOMPurify |
+| Build | Vite 6, electron-builder 25, Vitest 2 |
 
 ## Security Model
 
-| Threat | Mitigation | Status |
-|---|---|---|
-| Server compromise | No server. All messages relay through decentralized NKN nodes. | Done |
-| Message interception | End-to-end encryption (NKN SDK). Relay nodes cannot decrypt messages. | Done |
-| Local data theft | SQLCipher database encryption (AES-256), key derived from wallet seed. | Done |
-| Key extraction | Wallet seed encrypted via Electron `safeStorage` (OS keychain). safeStorage required — no plaintext fallback. `wallet.json` permissions set to `0600`. | Done |
-| Seed in memory | Ed25519 keypair cached as `Uint8Array`, zeroed on disconnect. Seed not held as instance field. | Done |
-| Renderer exploitation | Context isolation enabled, nodeIntegration disabled. Renderer has no Node.js access. | Done |
-| Seed exposure to renderer | Seed never crosses IPC boundary. All wallet operations return only address + publicKey. | Done |
-| Settings API access control | Allowlist restricts renderer to safe keys only (`ipfs_config`, `profile_*`, `notifications_muted`). | Done |
-| Metadata leakage | NKN's onion-like routing obscures sender/recipient from relay nodes. | Done |
+| Threat | Mitigation |
+|---|---|
+| Server compromise | No server — messages relay through decentralized NKN nodes |
+| Message interception | End-to-end encryption (NKN SDK) |
+| Local data theft | SQLCipher (AES-256), key derived from wallet seed |
+| Key extraction | safeStorage (OS keychain), `wallet.json` permissions `0600` |
+| Renderer exploitation | Context isolation, nodeIntegration disabled |
+| Seed exposure | Seed never crosses IPC boundary, zeroed on disconnect |
+| Settings API abuse | Allowlist restricts renderer to safe keys only |
 
-### Security Audit (2026-02-21)
-
-See `SECURITY_AUDIT.md` for the full audit report. All critical, high, and medium issues have been remediated.
+See `SECURITY_AUDIT.md` for the full audit report.
 
 ## Roadmap
 
 | Phase | Focus | Status |
 |---|---|---|
-| 1 | Foundation — NKN client, 1-to-1 messaging, contacts, SQLite DB | Complete |
-| 2 | Rich messaging — Image, voice, and file messaging, IPFS, AES-GCM encryption | Complete |
+| 1 | Foundation — NKN client, 1-to-1 messaging, contacts, encrypted DB | Complete |
+| 2 | Rich messaging — Image, voice, file, IPFS, burn-after-read | Complete |
 | 3 | Group chat — Public topics, private groups | Complete |
-| 4 | Wallet & polish — NKN/ETH wallets, multi-device sync, notifications | NKN wallet complete |
+| 4 | Wallet & polish — NKN wallet, notifications, profile sync | Complete |
+| 5 | Security hardening — SQLCipher, safeStorage, audit | Complete |
+| 6 | Video, multi-device sync, ETH wallet, name service | Planned |
 
 ## Acknowledgments
 
