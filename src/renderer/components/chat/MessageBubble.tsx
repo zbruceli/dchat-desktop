@@ -349,6 +349,53 @@ function BurnIndicator({ deleteAt }: { deleteAt: number }) {
   );
 }
 
+/** Floating action toolbar — appears on hover, Slack/Discord style */
+function MessageActions({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div className="absolute -top-4 right-2 hidden group-hover:flex items-center bg-surface-deepest border border-border-subtle rounded-lg shadow-xl z-10">
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded-lg transition-colors"
+      >
+        {copied ? (
+          <>
+            <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-green-400">Copied</span>
+          </>
+        ) : (
+          <>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copy</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/** Check if a message has copyable text content */
+function isCopyableMessage(message: Message): boolean {
+  const ct = message.contentType;
+  return (ct === "text" || ct === "textExtension") && !!message.content;
+}
+
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   const isOutbound = message.isOutbound;
   const contacts = useContactStore((s) => s.contacts);
@@ -427,11 +474,14 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     </>
   );
 
+  const copyable = isCopyableMessage(message);
+
   // Outbound messages: right-aligned with accent bubble, no avatar
   if (isOutbound) {
     return (
       <div className="flex justify-end px-5 py-1">
-        <div className="max-w-[70%]">
+        <div className={`max-w-[70%] relative ${copyable ? "group" : ""}`}>
+          {copyable && <MessageActions text={message.content} />}
           <div className="flex items-center justify-end gap-2 mb-0.5">
             {message.deleteAt && <BurnIndicator deleteAt={message.deleteAt} />}
             <span className={`text-[11px] ${message.status === "failed" ? "text-red-400" : message.status === "read" ? "text-blue-400" : "text-text-faint"}`}>
@@ -439,7 +489,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             </span>
             <span className="text-[11px] text-text-muted">{time}</span>
           </div>
-          <div className="bg-accent-600 rounded-2xl rounded-br-sm px-4 py-2">
+          <div className="bg-accent-600 rounded-2xl rounded-br-sm px-4 py-2 select-text">
             {messageContent}
           </div>
         </div>
@@ -452,7 +502,8 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
   // Inbound messages: left-aligned with avatar
   return (
     <div className="flex justify-start px-5 py-1">
-      <div className="flex items-start gap-3 max-w-[70%]">
+      <div className={`flex items-start gap-3 max-w-[70%] relative ${copyable ? "group" : ""}`}>
+        {copyable && <MessageActions text={message.content} />}
         <div
           className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 cursor-pointer hover:opacity-80 overflow-hidden ${senderAvatarUrl ? "" : avatarColor}`}
           onClick={() => openProfile(message.sender)}
@@ -476,7 +527,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             <span className="text-[11px] text-text-muted">{time}</span>
             {message.deleteAt && <BurnIndicator deleteAt={message.deleteAt} />}
           </div>
-          <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2">
+          <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2 select-text">
             {messageContent}
           </div>
         </div>
