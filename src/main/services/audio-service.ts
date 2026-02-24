@@ -1,14 +1,18 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { app } from "electron";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import { decryptAesGcm } from "../crypto/aes-gcm";
 import type { IpfsService } from "./ipfs-service";
 import type { MessageOptions } from "../../shared/types/message";
 
-// Point fluent-ffmpeg at the bundled binary
-ffmpeg.setFfmpegPath(ffmpegPath.path);
+// In packaged builds, ffmpeg is unpacked outside ASAR — fix the path
+const resolvedFfmpegPath = app.isPackaged
+  ? ffmpegPath.path.replace(/app\.asar([/\\])/, "app.asar.unpacked$1")
+  : ffmpegPath.path;
+ffmpeg.setFfmpegPath(resolvedFfmpegPath);
 
 export interface AudioProcessResult {
   contentType: "audio";
