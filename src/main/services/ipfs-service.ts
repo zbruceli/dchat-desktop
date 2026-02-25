@@ -147,7 +147,7 @@ export class IpfsService {
 
     return new Promise<string>((resolve, reject) => {
       const client = gw.protocol === "https:" ? https : http;
-      const req = client.request(
+      const req = (client as any).request(
         {
           hostname: gw.host,
           port: gw.port,
@@ -205,7 +205,7 @@ export class IpfsService {
 
     return new Promise<Buffer>((resolve, reject) => {
       const client = gw.protocol === "https:" ? https : http;
-      const req = client.request(
+      const req = (client as unknown as { request: (options: any, callback: (res: any) => void) => any }).request(
         {
           hostname: gw.host,
           port: gw.port,
