@@ -10,6 +10,7 @@ import type {
   PrivateGroup,
   PrivateGroupMember,
   DiscoveredGroup,
+  BotWalletInfo,
 } from "../shared/types";
 
 const api = {
@@ -270,6 +271,14 @@ const api = {
       ipcRenderer.on("discovery:onUpdate", handler);
       return () => ipcRenderer.removeListener("discovery:onUpdate", handler);
     },
+  },
+  bot: {
+    create: (): Promise<BotWalletInfo> =>
+      ipcRenderer.invoke("bot:create"),
+    get: (): Promise<BotWalletInfo | null> =>
+      ipcRenderer.invoke("bot:get"),
+    delete: (): Promise<void> =>
+      ipcRenderer.invoke("bot:delete"),
   },
 };
 

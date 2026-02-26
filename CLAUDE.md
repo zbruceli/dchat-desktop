@@ -44,8 +44,13 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - User profile panel — View any user from avatar/subscriber/member clicks
 - Discover page — Browse/search/filter public groups by category, join with one click
 - Login page — Create/import/restore wallet
-- Settings — Profile, notification mute, wallet backup, DB backup/restore, IPFS gateway config
+- Settings — Profile, notification mute, wallet backup, DB backup/restore, NKN bot wallet, IPFS gateway config
 - Dark theme with three-tone surface hierarchy, custom Tailwind tokens
+
+### Bot Support
+- NKN bot wallet — One-click generation of standalone NKN credentials (public key, wallet address, seed) for use in external bot code
+- Seed encrypted at rest via `safeStorage`, hidden by default in UI
+- Regenerate and delete with confirmation dialogs
 
 ### Not Yet Built
 - Video sharing
@@ -88,7 +93,8 @@ src/
 │   │   ├── session-service.ts     # Session CRUD
 │   │   ├── profile-service.ts     # Avatar + nickname persistence
 │   │   ├── contact-profile-service.ts # Profile exchange with nMobile
-│   │   └── wallet-storage-service.ts  # wallet.json + safeStorage
+│   │   ├── wallet-storage-service.ts  # wallet.json + safeStorage
+│   │   └── bot-wallet-storage-service.ts # bot-wallet.json + safeStorage
 │   ├── db/
 │   │   ├── database.ts            # SQLCipher singleton (WAL, FK)
 │   │   ├── migrations/            # 10 versioned migrations (001–010)
@@ -108,7 +114,7 @@ src/
 │   ├── hooks/                     # use-ipc-subscriptions (push events)
 │   └── styles/global.css          # Tailwind + rich-text styles
 ├── shared/                        # Shared between main and renderer
-│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client, Discovery
+│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client, Discovery, Bot
 │   ├── constants.ts               # App constants, burn durations, NKN seed servers
 │   └── ipc-channels.ts            # Typed IPC channel definitions
 ├── preload/index.ts               # contextBridge → typed window.dchat API

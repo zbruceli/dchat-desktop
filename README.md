@@ -45,6 +45,9 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - [x] **Profile** — Nickname + avatar, exchanged with nMobile contacts
 - [x] **User profile panel** — View any user's profile from message avatar, subscriber list, or member list
 
+### Bot Support
+- [x] **NKN bot wallet** — One-click generation of standalone NKN credentials (public key, wallet address, seed) for use in external bot code, seed encrypted at rest via OS keychain
+
 ### Security
 - [x] **SQLCipher encryption** — AES-256, keyed to wallet seed
 - [x] **safeStorage** — Wallet seed encrypted via OS keychain, no plaintext fallback
@@ -56,7 +59,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - [x] **Mute notifications** — Per-conversation toggle + global mute in Settings
 - [x] **Connection status** — Green/yellow/red indicator with avatar
 - [x] **Discover tab** — Browse public groups with category filters, search, and subscriber counts
-- [x] **Settings** — Profile editing, wallet backup, database backup/restore, IPFS gateway config
+- [x] **Settings** — Profile editing, wallet backup, database backup/restore, NKN bot wallet, IPFS gateway config
 - [x] **nMobile interop** — Full compatibility with nMobile wire formats
 
 ## Getting Started

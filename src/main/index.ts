@@ -9,6 +9,7 @@ import { ContactRepository } from "./db/repositories/contact-repository";
 import { SessionRepository } from "./db/repositories/session-repository";
 import { NknClientService } from "./services/nkn-client-service";
 import { WalletStorageService } from "./services/wallet-storage-service";
+import { BotWalletStorageService } from "./services/bot-wallet-storage-service";
 import { ChatService } from "./services/chat-service";
 import { ContactService } from "./services/contact-service";
 import { SessionService } from "./services/session-service";
@@ -153,6 +154,7 @@ app.whenReady().then(() => {
   });
 
   const walletStorage = new WalletStorageService(userDataPath);
+  const botWalletStorage = new BotWalletStorageService(userDataPath);
 
   // Track whether services have been initialized
   let servicesInitialized = false;
@@ -297,7 +299,7 @@ app.whenReady().then(() => {
   }
 
   // 4. Register pre-DB IPC handlers (wallet, client, app)
-  registerPreDbHandlers(nknClient, walletStorage, initServices);
+  registerPreDbHandlers(nknClient, walletStorage, botWalletStorage, initServices);
 
   ipcMain.handle(IPC.APP.GET_INFO, () => ({
     name: app.getName(),

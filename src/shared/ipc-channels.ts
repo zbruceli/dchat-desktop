@@ -114,4 +114,9 @@ export const IPC = {
     REFRESH: "discovery:refresh",
     ON_UPDATE: "discovery:onUpdate",
   },
+  BOT: {
+    CREATE: "bot:create",
+    GET: "bot:get",
+    DELETE: "bot:delete",
+  },
 } as const;

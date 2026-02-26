@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useProfileStore } from "../../stores/profile-store";
+import { CopyableField } from "../../components/common/CopyableField";
 
 interface IpfsConfig {
   gateways?: { host: string; port: number; protocol: string; authHeader?: string }[];
@@ -283,6 +284,139 @@ function DatabaseBackupSection() {
   );
 }
 
+interface BotWalletInfo {
+  publicKey: string;
+  walletAddress: string;
+  seed: string;
+}
+
+function NknBotSection() {
+  const [bot, setBot] = useState<BotWalletInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [showSeed, setShowSeed] = useState(false);
+  const [seedCopied, setSeedCopied] = useState(false);
+
+  useEffect(() => {
+    window.dchat.bot
+      .get()
+      .then((info) => setBot(info))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const info = await window.dchat.bot.create();
+      setBot(info);
+      setShowSeed(false);
+    } catch (err) {
+      console.error("Failed to create bot wallet:", err);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    const confirmed = window.confirm(
+      "This will destroy the current bot wallet and generate a new one. The old bot credentials will stop working. Continue?",
+    );
+    if (!confirmed) return;
+    await handleCreate();
+  }
+
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      "Delete the bot wallet? Any bots using these credentials will stop working.",
+    );
+    if (!confirmed) return;
+    try {
+      await window.dchat.bot.delete();
+      setBot(null);
+      setShowSeed(false);
+    } catch (err) {
+      console.error("Failed to delete bot wallet:", err);
+    }
+  }
+
+  async function handleCopySeed() {
+    if (!bot) return;
+    await navigator.clipboard.writeText(bot.seed);
+    setSeedCopied(true);
+    setTimeout(() => setSeedCopied(false), 1500);
+  }
+
+  if (loading) return null;
+
+  return (
+    <section className="max-w-lg mb-8">
+      <h2 className="text-sm font-medium text-text-secondary mb-4">NKN Bot</h2>
+      <p className="text-xs text-text-muted mb-4">
+        Generate a standalone NKN wallet for use as a bot. Copy the credentials into your bot code.
+        The bot is not connected from within D-Chat.
+      </p>
+
+      {!bot ? (
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          {creating ? "Creating..." : "Create Bot Wallet"}
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <CopyableField label="D-Chat ID (Public Key)" value={bot.publicKey} />
+          <CopyableField label="Wallet Address" value={bot.walletAddress} />
+
+          {/* Seed field with show/hide */}
+          <div className="space-y-1">
+            <div className="text-[10px] text-text-muted uppercase tracking-wide">Seed</div>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0 px-2 py-1.5 bg-surface-raised rounded text-[11px] text-text-secondary font-mono truncate select-all">
+                {showSeed ? bot.seed : "\u2022".repeat(32)}
+              </div>
+              <button
+                onClick={() => setShowSeed(!showSeed)}
+                className="flex-shrink-0 px-2 py-1.5 text-[10px] rounded bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+              >
+                {showSeed ? "Hide" : "Show"}
+              </button>
+              <button
+                onClick={handleCopySeed}
+                className="flex-shrink-0 px-2 py-1.5 text-[10px] rounded bg-surface-raised hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+              >
+                {seedCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleRegenerate}
+              disabled={creating}
+              className="px-4 py-2 bg-surface-raised hover:bg-surface-border border border-surface-border text-text-primary rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {creating ? "Creating..." : "Regenerate"}
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+
+          <p className="text-[11px] text-text-faint">
+            Keep the seed secret. Anyone with the seed can impersonate this bot.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const [gatewayHost, setGatewayHost] = useState("64.225.88.71");
   const [gatewayPort, setGatewayPort] = useState("80");
@@ -339,6 +473,8 @@ export function SettingsPage() {
       <WalletBackupSection />
 
       <DatabaseBackupSection />
+
+      <NknBotSection />
 
       <section className="max-w-lg">
         <h2 className="text-sm font-medium text-text-secondary mb-4">IPFS Configuration</h2>

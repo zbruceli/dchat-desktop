@@ -9,8 +9,10 @@ import { registerProfileHandlers } from "./profile-handlers";
 import { registerPrivateGroupHandlers } from "./private-group-handlers";
 import { registerDatabaseHandlers } from "./database-handlers";
 import { registerDiscoveryHandlers } from "./discovery-handlers";
+import { registerBotHandlers } from "./bot-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
+import type { BotWalletStorageService } from "../services/bot-wallet-storage-service";
 import type { ChatService } from "../services/chat-service";
 import type { ContactService } from "../services/contact-service";
 import type { SessionService } from "../services/session-service";
@@ -24,10 +26,12 @@ import type { TopicRepository } from "../db/repositories/topic-repository";
 export function registerPreDbHandlers(
   nknClient: NknClientService,
   walletStorage: WalletStorageService,
+  botWalletStorage: BotWalletStorageService,
   initServices: (seed: string) => void,
 ): void {
   registerClientHandlers(nknClient);
   registerWalletHandlers(nknClient, walletStorage, initServices);
+  registerBotHandlers(botWalletStorage);
 }
 
 export interface PostDbHandlersParams {
