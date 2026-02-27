@@ -74,7 +74,10 @@ export class MessageRepository {
   findBySessionId(sessionId: string, limit = 100, offset = 0): Message[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM message WHERE session_id = ? AND is_delete = 0 ORDER BY created_at ASC LIMIT ? OFFSET ?`,
+        `SELECT * FROM (
+           SELECT * FROM message WHERE session_id = ? AND is_delete = 0
+           ORDER BY created_at DESC LIMIT ? OFFSET ?
+         ) ORDER BY created_at ASC`,
       )
       .all(sessionId, limit, offset) as MessageRow[];
     return rows.map(rowToMessage);

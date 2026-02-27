@@ -8,7 +8,7 @@ import { useClientStore } from "../../stores/client-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
 import { truncateAddress } from "../../utils/address";
-import type { TopicSubscriber } from "../../../shared/types";
+import type { Message, TopicSubscriber } from "../../../shared/types";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
@@ -151,6 +151,38 @@ function SubscriberPanel({
   );
 }
 
+function MessagesContainer({ messages, isTopic }: { messages: Message[]; isTopic: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef<number>(0);
+
+  // Smooth scroll when new messages arrive (column-reverse handles initial position)
+  useEffect(() => {
+    if (prevCountRef.current > 0 && messages.length > prevCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevCountRef.current = messages.length;
+  }, [messages.length]);
+
+  return (
+    <div ref={containerRef} className="flex-1 overflow-y-auto py-2 flex flex-col-reverse">
+      <div>
+        {messages.length === 0 && (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-text-muted">
+              {isTopic ? "No messages yet in this topic." : "No messages yet. Say hello!"}
+            </p>
+          </div>
+        )}
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} showSender={true} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
+    </div>
+  );
+}
+
 export function MessageThread() {
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const messagesBySession = useChatStore((s) => s.messagesBySession);
@@ -177,10 +209,6 @@ export function MessageThread() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showContactPanel, setShowContactPanel] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const prevSessionRef = useRef<string | null>(null);
-  const prevMessageCountRef = useRef<number>(0);
-
   const messages = activeSessionId ? messagesBySession[activeSessionId] ?? [] : [];
   const session = sessions.find((s) => s.id === activeSessionId);
   const isTopic = session?.type === "topic";
@@ -205,20 +233,6 @@ export function MessageThread() {
     setShowContactPanel(false);
   }, [activeSessionId, isGroup]);
 
-  // Scroll to bottom: instantly on session switch, smoothly on new messages
-  useEffect(() => {
-    const sessionChanged = activeSessionId !== prevSessionRef.current;
-    const messageCountChanged = messages.length !== prevMessageCountRef.current;
-
-    prevSessionRef.current = activeSessionId;
-    prevMessageCountRef.current = messages.length;
-
-    if (sessionChanged) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-    } else if (messageCountChanged) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [activeSessionId, messages.length]);
 
   if (!activeSessionId || !session) {
     return (
@@ -394,19 +408,7 @@ export function MessageThread() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto py-2">
-          {messages.length === 0 && (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-text-muted">
-                {isTopic ? "No messages yet in this topic." : "No messages yet. Say hello!"}
-              </p>
-            </div>
-          )}
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} showSender={true} />
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
+        <MessagesContainer key={activeSessionId} messages={messages} isTopic={!!isTopic} />
 
         {/* Input */}
         <MessageInput
