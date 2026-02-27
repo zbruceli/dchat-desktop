@@ -1,8 +1,13 @@
+import fs from "fs";
+import path from "path";
+import { app } from "electron";
+import sharp from "sharp";
 import type { NknClientService } from "./nkn-client-service";
+import type { TopicService } from "./topic-service";
 import type { TopicRepository } from "../db/repositories/topic-repository";
 import type { TopicSubscriberRepository } from "../db/repositories/topic-subscriber-repository";
 import type { DiscoveredGroupRepository } from "../db/repositories/discovered-group-repository";
-import type { DiscoveredGroup, DiscoveryBroadcastMessage } from "../../shared/types";
+import type { DiscoveredGroup, DiscoveryBroadcastMessage, AnnouncementMessage, AnnouncementGroup } from "../../shared/types";
 import { genTopicHash } from "../utils/topic-hash";
 
 const DISCOVERY_TOPIC_NAME = "publicGroups";
@@ -28,6 +33,8 @@ export class DiscoveryService {
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private discoveryTopicHash: string;
+  private discoveryCacheDir: string;
+  private topicService: TopicService | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -37,6 +44,10 @@ export class DiscoveryService {
     private pushToRenderer: (channel: string, data: unknown) => void,
   ) {
     this.discoveryTopicHash = genTopicHash(DISCOVERY_TOPIC_NAME);
+    this.discoveryCacheDir = path.join(app.getPath("userData"), "discovery-cache");
+    if (!fs.existsSync(this.discoveryCacheDir)) {
+      fs.mkdirSync(this.discoveryCacheDir, { recursive: true });
+    }
   }
 
   async start(): Promise<void> {
@@ -140,49 +151,101 @@ export class DiscoveryService {
     const discoveredGroups = this.discoveredGroupRepo.findAll();
 
     // Build unique group list, prioritize joined topics
-    const groupMap = new Map<string, { n: string; d?: string; c?: string; s: number }>();
+    const groupMap = new Map<string, AnnouncementGroup>();
 
     for (const topic of joinedTopics) {
       groupMap.set(topic.id, {
-        n: topic.id,
-        s: topic.memberCount,
+        topicId: topic.id,
+        name: topic.id,
+        subscriberCount: topic.memberCount,
       });
     }
 
     for (const group of discoveredGroups) {
       if (!groupMap.has(group.topicName)) {
-        groupMap.set(group.topicName, {
-          n: group.topicName,
-          d: group.description,
-          c: group.category,
-          s: group.subscriberCount,
-        });
+        const announcementGroup: AnnouncementGroup = {
+          topicId: group.topicName,
+          name: group.topicName,
+          description: group.description,
+          category: group.category,
+          subscriberCount: group.subscriberCount,
+        };
+
+        // Include cached avatar if available
+        if (group.avatarUri) {
+          const avatarData = this.readCachedAvatar(group.avatarUri);
+          if (avatarData) {
+            announcementGroup.avatar = avatarData;
+          }
+        }
+
+        groupMap.set(group.topicName, announcementGroup);
       }
     }
 
     const groups = Array.from(groupMap.values()).slice(0, MAX_BROADCAST_GROUPS);
     if (groups.length === 0) return;
 
-    const broadcastMsg: DiscoveryBroadcastMessage = {
-      contentType: "discovery:broadcast",
-      groups,
+    const announcementMsg: AnnouncementMessage = {
+      type: "announcement",
+      version: "1.0",
+      timestamp: new Date().toISOString(),
       sender: myAddress,
-      timestamp: Date.now(),
+      payload: { groups },
     };
+
+    // Base64-encode the JSON (nMobile 2026 format)
+    const base64Payload = Buffer.from(JSON.stringify(announcementMsg)).toString("base64");
 
     // Send to all subscribers on the discovery topic
     try {
       const subscribers = await this.nknClient.getSubscribers(this.discoveryTopicHash);
       const dests = subscribers.filter((addr) => addr !== myAddress);
       if (dests.length > 0) {
-        this.nknClient.sendToMultiple(dests, JSON.stringify(broadcastMsg));
-        console.log(`[DiscoveryService] Broadcast ${groups.length} groups to ${dests.length} peers`);
+        this.nknClient.sendToMultiple(dests, base64Payload);
+        console.log(`[DiscoveryService] Broadcast ${groups.length} groups to ${dests.length} peers (nMobile 2026 format)`);
       }
     } catch (err) {
       console.error("[DiscoveryService] Failed to broadcast:", err);
     }
   }
 
+  /** Handle nMobile 2026 announcement messages (base64-decoded by chat-service) */
+  handleAnnouncementMessage(src: string, msg: AnnouncementMessage): void {
+    if (!msg.payload?.groups || !Array.isArray(msg.payload.groups)) return;
+
+    const now = Date.now();
+    let updated = false;
+
+    for (const g of msg.payload.groups) {
+      if (!g.topicId || typeof g.topicId !== "string") continue;
+      if (g.topicId.length > 64) continue;
+
+      // Cache avatar if present
+      let avatarUri: string | undefined;
+      if (g.avatar?.data && g.avatar?.ext) {
+        avatarUri = this.cacheAvatar(g.topicId, g.avatar.data, g.avatar.ext);
+      }
+
+      this.discoveredGroupRepo.upsert({
+        topicName: g.topicId,
+        description: g.description ?? g.name,
+        category: g.category,
+        subscriberCount: g.subscriberCount ?? 0,
+        reportedBy: src,
+        lastReportedAt: now,
+        avatarUri,
+      });
+      updated = true;
+    }
+
+    if (updated) {
+      console.log(`[DiscoveryService] Received announcement from ${src.substring(0, 16)}... with ${msg.payload.groups.length} groups`);
+      this.pushDiscoveryUpdate();
+    }
+  }
+
+  /** Handle old D-Chat compact broadcast format (backward compat) */
   handleIncomingBroadcast(src: string, data: DiscoveryBroadcastMessage): void {
     if (!data.groups || !Array.isArray(data.groups)) return;
 
@@ -262,10 +325,100 @@ export class DiscoveryService {
     await this.verifySubscriberCounts();
   }
 
+  setTopicService(topicService: TopicService): void {
+    this.topicService = topicService;
+  }
+
+  async createAndBroadcastGroup(params: {
+    name: string;
+    description?: string;
+    category?: string;
+    avatarPath?: string;
+  }): Promise<void> {
+    if (!this.topicService) throw new Error("TopicService not set");
+
+    // Create and join the topic (blockchain subscribe + DB insert)
+    await this.topicService.createAndJoin(params.name);
+
+    // Process avatar if provided
+    let avatarUri: string | undefined;
+    if (params.avatarPath) {
+      try {
+        const safeName = params.name.replace(/[/\\:*?"<>|]/g, "_");
+        const filename = `${safeName}.jpeg`;
+        const outputPath = path.join(this.discoveryCacheDir, filename);
+        await sharp(params.avatarPath)
+          .resize(200, 200, { fit: "cover" })
+          .jpeg({ quality: 85 })
+          .toFile(outputPath);
+        avatarUri = filename;
+      } catch (err) {
+        console.error("[DiscoveryService] Failed to process avatar:", err);
+      }
+    }
+
+    // Upsert into discovered_group
+    const myAddress = this.nknClient.getAddress() ?? "self";
+    this.discoveredGroupRepo.upsert({
+      topicName: params.name,
+      description: params.description,
+      category: params.category,
+      subscriberCount: 1,
+      reportedBy: myAddress,
+      lastReportedAt: Date.now(),
+      avatarUri,
+    });
+
+    // Broadcast immediately
+    await this.broadcastKnownGroups();
+
+    // Push update to renderer
+    this.pushDiscoveryUpdate();
+  }
+
   private pushDiscoveryUpdate(): void {
     const joinedTopics = this.topicRepo.findJoined();
     const joinedNames = joinedTopics.map((t) => t.id);
     const groups = this.getDiscoveredGroups(joinedNames);
     this.pushToRenderer("discovery:onUpdate", groups);
+  }
+
+  /** Save base64 avatar data to discovery-cache, return filename */
+  private cacheAvatar(topicId: string, base64Data: string, ext: string): string | undefined {
+    try {
+      // Sanitize filename — only allow alphanumeric, dash, underscore, unicode letters
+      const safeTopicId = topicId.replace(/[/\\:*?"<>|]/g, "_");
+      const safeExt = ext.replace(/[^a-zA-Z0-9]/g, "");
+      const filename = `${safeTopicId}.${safeExt}`;
+      const filePath = path.join(this.discoveryCacheDir, filename);
+
+      const buffer = Buffer.from(base64Data, "base64");
+      // Basic sanity check — reject suspiciously small or large data
+      if (buffer.length < 10 || buffer.length > 5 * 1024 * 1024) return undefined;
+
+      fs.writeFileSync(filePath, buffer);
+      return filename;
+    } catch (err) {
+      console.error(`[DiscoveryService] Failed to cache avatar for "${topicId}":`, err);
+      return undefined;
+    }
+  }
+
+  /** Read cached avatar file and return base64 data for broadcast */
+  private readCachedAvatar(avatarUri: string): { type: "base64"; data: string; ext: string } | undefined {
+    try {
+      const filePath = path.join(this.discoveryCacheDir, avatarUri);
+      if (!fs.existsSync(filePath)) return undefined;
+
+      const buffer = fs.readFileSync(filePath);
+      const ext = path.extname(avatarUri).replace(".", "");
+      return {
+        type: "base64",
+        data: buffer.toString("base64"),
+        ext: ext || "jpeg",
+      };
+    } catch {
+      return undefined;
+    }
   }
 }

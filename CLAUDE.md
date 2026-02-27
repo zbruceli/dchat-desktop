@@ -29,6 +29,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported
 - **Private groups** — Off-chain Ed25519 dual-signature membership, owner/admin/member permissions, invite/kick/leave, member sync protocol
 - **Public group discovery** — P2P discovery via shared `publicGroups` NKN topic, 10-min broadcast interval, blockchain subscriber count verification, 7-day stale cleanup, seed groups (d-chat, nkn, general, nMobile, nkn-chat, 中文), Discover tab with search/category filters
+- **Create & broadcast public group** — Create public groups from Discover page with name, description, category, avatar; blockchain subscribe + immediate P2P broadcast; announcement messages rendered as group cards in #publicGroups
 
 ### Identity & Security
 - NKN wallet — Create/import/export keystore, send/receive NKN tokens
@@ -42,7 +43,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - Desktop notifications (native OS, click-to-navigate, per-session + global mute)
 - Contact edit panel with burn-after-read toggle (accessible from chat header)
 - User profile panel — View any user from avatar/subscriber/member clicks
-- Discover page — Browse/search/filter public groups by category, join with one click
+- Discover page — Browse/search/filter public groups by category, join with one click, create new public groups with metadata and avatar
 - Login page — Create/import/restore wallet
 - Settings — Profile, notification mute, wallet backup, DB backup/restore, NKN bot wallet, IPFS gateway config
 - Dark theme with three-tone surface hierarchy, custom Tailwind tokens
@@ -124,7 +125,7 @@ src/
 ## Commands
 
 ```bash
-npm run dev          # Vite hot reload + Electron
+npm run dev          # Vite hot reload + Electron (preferred for testing)
 npm run build        # Production build (main + preload + renderer)
 npm run test         # Unit tests (Vitest)
 npm run typecheck    # TypeScript type check
@@ -133,6 +134,12 @@ npm run package:mac  # macOS (DMG + ZIP)
 npm run package:win  # Windows (NSIS + portable)
 npm run package:linux # Linux (AppImage + DEB)
 ```
+
+### Build & Launch Notes
+- **Dev mode** (`npm run dev`): Builds main + preload via tsc, then runs Vite dev server (port 5173) + Electron concurrently. This is the correct way to test the app locally.
+- **Production build** (`npm run build`): Outputs to `dist/main/main/`, `dist/preload/preload/`, `dist/renderer/`. The `package.json` `"main"` field is `dist/main/main/index.js`.
+- **Do NOT** run `npx electron dist/main/index.js` — the correct entry is `npx electron .` (reads `"main"` from `package.json`), but this only works after `npm run build` and the renderer will be blank unless Vite dev server is also running or the built renderer HTML path is correct.
+- **Always prefer `npm run dev`** for testing changes — it handles everything automatically.
 
 ## Database Schema (10 migrations)
 

@@ -13,6 +13,7 @@ interface DiscoveryState {
   setSelectedCategory: (category: string | null) => void;
   setSearchQuery: (query: string) => void;
   refresh: () => Promise<void>;
+  createGroup: (params: { name: string; description?: string; category?: string; avatarPath?: string }) => Promise<void>;
   handleDiscoveryUpdate: (groups: DiscoveredGroup[]) => void;
 }
 
@@ -62,6 +63,13 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
       console.error("Failed to refresh discovery:", err);
       set({ refreshing: false });
     }
+  },
+
+  createGroup: async (params) => {
+    await window.dchat.discovery.createGroup(params);
+    const groups = await window.dchat.discovery.list();
+    const categories = await window.dchat.discovery.getCategories();
+    set({ groups, categories });
   },
 
   handleDiscoveryUpdate: (groups: DiscoveredGroup[]) => {

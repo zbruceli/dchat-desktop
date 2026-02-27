@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import DOMPurify from "dompurify";
-import type { Message, MessageOptions } from "../../../shared/types";
+import type { Message, MessageOptions, AnnouncementMessage, AnnouncementGroup } from "../../../shared/types";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
+import { useTopicStore } from "../../stores/topic-store";
+import { useNavStore } from "../../stores/nav-store";
 import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
 import { truncateAddress, stringToColor } from "../../utils/address";
 import { ImageModal } from "./ImageModal";
@@ -312,6 +314,101 @@ function MarkdownContent({ content, isOutbound }: { content: string; isOutbound:
   );
 }
 
+/** Try to parse base64-encoded announcement message */
+function parseAnnouncement(content: string): AnnouncementMessage | null {
+  try {
+    // Must look like base64 (long alphanumeric string)
+    if (content.length < 50 || /\s/.test(content.trim())) return null;
+    const decoded = atob(content.trim());
+    const parsed = JSON.parse(decoded);
+    if (parsed.type === "announcement" || parsed.type === "periodic") {
+      return parsed as AnnouncementMessage;
+    }
+  } catch {
+    // not an announcement
+  }
+  // Also try direct JSON (non-base64)
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed.type === "announcement" || parsed.type === "periodic") {
+      return parsed as AnnouncementMessage;
+    }
+  } catch {
+    // not JSON
+  }
+  return null;
+}
+
+function AnnouncementGroupCard({ group }: { group: AnnouncementGroup }) {
+  const joinTopic = useTopicStore((s) => s.joinTopic);
+  const setActiveSession = useChatStore((s) => s.setActiveSession);
+  const setActiveNav = useNavStore((s) => s.setActiveNav);
+  const [joining, setJoining] = useState(false);
+
+  const avatarSrc = group.avatar?.data
+    ? `data:image/jpeg;base64,${group.avatar.data}`
+    : null;
+
+  const handleJoin = async () => {
+    if (joining) return;
+    setJoining(true);
+    try {
+      await joinTopic(group.topicId);
+      setActiveSession(`topic:${group.topicId}`);
+      setActiveNav("chat");
+    } catch (err) {
+      console.error("Failed to join topic:", err);
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-black/20 hover:bg-black/30 transition-colors cursor-pointer"
+      onClick={handleJoin}
+    >
+      <div className="w-9 h-9 rounded-lg bg-accent-500/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+        {avatarSrc ? (
+          <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-accent-400 font-semibold text-xs">#</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-text-primary truncate">#{group.topicId}</p>
+        {group.description && (
+          <p className="text-[11px] text-text-muted truncate">{group.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {group.subscriberCount > 0 && (
+          <span className="text-[10px] text-text-muted">{group.subscriberCount}</span>
+        )}
+        <span className="text-[10px] px-2 py-0.5 rounded bg-accent-500/30 text-accent-300">
+          {joining ? "..." : "Join"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementContent({ announcement }: { announcement: AnnouncementMessage }) {
+  const groups = announcement.payload?.groups ?? [];
+  if (groups.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5 min-w-[240px]">
+      <p className="text-[11px] text-text-muted font-medium uppercase tracking-wide">
+        Group Discovery ({groups.length})
+      </p>
+      {groups.map((g) => (
+        <AnnouncementGroupCard key={g.topicId} group={g} />
+      ))}
+    </div>
+  );
+}
+
 /** Render text content with markdown/HTML detection */
 function TextContent({ content, isOutbound }: { content: string; isOutbound: boolean }) {
   const hasHtml = useMemo(() => containsHtml(content), [content]);
@@ -458,9 +555,17 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
 
   const isInvitation = message.contentType === "privateGroup:invitation";
 
+  // Try to detect announcement messages (base64-encoded group discovery broadcasts)
+  const announcement = useMemo(() => {
+    if (message.contentType !== "text" && message.contentType !== "textExtension") return null;
+    return parseAnnouncement(message.content);
+  }, [message.content, message.contentType]);
+
   const messageContent = (
     <>
-      {isInvitation ? (
+      {announcement ? (
+        <AnnouncementContent announcement={announcement} />
+      ) : isInvitation ? (
         <InvitationContent message={message} />
       ) : isAudio || isIpfsAudio ? (
         <AudioContent message={message} />
@@ -474,7 +579,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     </>
   );
 
-  const copyable = isCopyableMessage(message);
+  const copyable = isCopyableMessage(message) && !announcement;
 
   // Outbound messages: right-aligned with accent bubble, no avatar
   if (isOutbound) {

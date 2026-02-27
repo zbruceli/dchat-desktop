@@ -112,6 +112,8 @@ export const IPC = {
     LIST: "discovery:list",
     GET_CATEGORIES: "discovery:getCategories",
     REFRESH: "discovery:refresh",
+    CREATE_GROUP: "discovery:createGroup",
+    PICK_AVATAR: "discovery:pickAvatar",
     ON_UPDATE: "discovery:onUpdate",
   },
   BOT: {

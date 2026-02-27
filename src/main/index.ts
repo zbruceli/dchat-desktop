@@ -265,6 +265,7 @@ app.whenReady().then(() => {
       pushToRenderer,
     );
     chatService.setDiscoveryService(discoveryService);
+    discoveryService.setTopicService(topicService);
 
     // Wire up desktop notifications
     if (mainWindow) {

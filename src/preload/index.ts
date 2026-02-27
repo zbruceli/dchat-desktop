@@ -265,6 +265,10 @@ const api = {
       ipcRenderer.invoke("discovery:getCategories"),
     refresh: (): Promise<DiscoveredGroup[]> =>
       ipcRenderer.invoke("discovery:refresh"),
+    pickAvatar: (): Promise<{ filePath: string; dataUrl: string } | null> =>
+      ipcRenderer.invoke("discovery:pickAvatar"),
+    createGroup: (params: { name: string; description?: string; category?: string; avatarPath?: string }): Promise<void> =>
+      ipcRenderer.invoke("discovery:createGroup", params),
     onUpdate: (callback: (groups: DiscoveredGroup[]) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, groups: DiscoveredGroup[]) =>
         callback(groups);
