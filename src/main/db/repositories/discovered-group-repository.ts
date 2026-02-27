@@ -9,6 +9,7 @@ interface DiscoveredGroupRow {
   reported_by: string;
   last_reported_at: number;
   last_verified_at: number | null;
+  avatar_uri: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -22,6 +23,7 @@ function rowToGroup(row: DiscoveredGroupRow): DiscoveredGroup {
     reportedBy: row.reported_by,
     lastReportedAt: row.last_reported_at,
     lastVerifiedAt: row.last_verified_at ?? undefined,
+    avatarUri: row.avatar_uri ?? undefined,
   };
 }
 
@@ -36,14 +38,15 @@ export class DiscoveredGroupRepository {
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO discovered_group (topic_name, description, category, subscriber_count, reported_by, last_reported_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO discovered_group (topic_name, description, category, subscriber_count, reported_by, last_reported_at, avatar_uri, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(topic_name) DO UPDATE SET
            description = COALESCE(excluded.description, discovered_group.description),
            category = COALESCE(excluded.category, discovered_group.category),
            subscriber_count = MAX(excluded.subscriber_count, discovered_group.subscriber_count),
            reported_by = excluded.reported_by,
            last_reported_at = MAX(excluded.last_reported_at, discovered_group.last_reported_at),
+           avatar_uri = COALESCE(excluded.avatar_uri, discovered_group.avatar_uri),
            updated_at = excluded.updated_at`,
       )
       .run(
@@ -53,6 +56,7 @@ export class DiscoveredGroupRepository {
         group.subscriberCount,
         group.reportedBy,
         group.lastReportedAt,
+        group.avatarUri ?? null,
         now,
         now,
       );

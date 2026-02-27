@@ -19,6 +19,7 @@ import type {
   MessageOptions,
   SendMessageParams,
   DiscoveryBroadcastMessage,
+  AnnouncementMessage,
 } from "../../shared/types";
 
 // Content types that represent user-visible messages
@@ -598,7 +599,21 @@ export class ChatService {
     try {
       raw = JSON.parse(payload);
     } catch {
-      return; // ignore malformed messages
+      // Try base64 decode (nMobile 2026 announcement format)
+      try {
+        const decoded = Buffer.from(payload, "base64").toString("utf-8");
+        raw = JSON.parse(decoded);
+      } catch {
+        return; // truly malformed
+      }
+    }
+
+    // Route nMobile 2026 announcement messages
+    if (raw.type === "announcement" || raw.type === "periodic") {
+      if (this.discoveryService) {
+        this.discoveryService.handleAnnouncementMessage(src, raw as AnnouncementMessage);
+      }
+      return;
     }
 
     // nMobile sends content as object for private group control messages — normalize to JSON string
