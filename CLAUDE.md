@@ -24,6 +24,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - File sharing — Any file up to 100 MB, AES-128-GCM encrypted via IPFS
 - Burn-after-read — Per-contact self-destructing messages (5s–1 week), countdown timer, `contactOptions` wire format, `textExtension` content type
 - Rich text — Auto-detect and render markdown/HTML (react-markdown + DOMPurify)
+- **P2P voice calls** — Real-time voice via NKN TUNA (paid relay), Go sidecar (`dchat-tuna`), PCM audio over stdio JSON-RPC, call signaling via NKN messages (`voiceCall:invite/accept/decline/end`), mic capture via AudioWorklet, mute/unmute, call duration timer
 
 ### Group Chat
 - **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported
@@ -62,14 +63,18 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Renderer (React + Zustand)                     │
-│  UI components, stores — no Node.js access      │
-├──────────── contextBridge (IPC) ────────────────┤
-│  Main Process                                   │
-│  NKN client, SQLCipher DB, crypto, file I/O,    │
-│  IPFS, desktop notifications, burn scheduler    │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  Renderer (React + Zustand)                             │
+│  UI components, stores — no Node.js access              │
+├──────────── contextBridge (IPC) ────────────────────────┤
+│  Main Process (Node.js)                                 │
+│  NKN client, SQLCipher DB, crypto, file I/O,            │
+│  IPFS, desktop notifications, burn scheduler            │
+│  VoiceCallService ↔ JSON-RPC stdio ↔ dchat-tuna binary │
+│                                         ↕               │
+│                                    TUNA relay nodes      │
+│                                    (paid, NKN token)     │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
@@ -94,6 +99,7 @@ src/
 │   │   ├── session-service.ts     # Session CRUD
 │   │   ├── profile-service.ts     # Avatar + nickname persistence
 │   │   ├── contact-profile-service.ts # Profile exchange with nMobile
+│   │   ├── voice-call-service.ts     # TUNA sidecar lifecycle, call state machine, signaling
 │   │   ├── wallet-storage-service.ts  # wallet.json + safeStorage
 │   │   └── bot-wallet-storage-service.ts # bot-wallet.json + safeStorage
 │   ├── db/
@@ -106,20 +112,26 @@ src/
 │       └── ed25519-signature.ts   # Ed25519 sign/verify, group version
 ├── renderer/                      # React app (sandboxed)
 │   ├── App.tsx                    # Auth gate + sidebar nav + routing
-│   ├── stores/                    # Zustand: client, chat, contact, session, topic, private-group, profile, nav, user-profile-panel, discovery
+│   ├── stores/                    # Zustand: client, chat, contact, session, topic, private-group, profile, nav, user-profile-panel, discovery, voice-call
 │   ├── pages/                     # Login, Chat, Contacts, Discover, Wallet, Settings
 │   ├── components/
 │   │   ├── chat/                  # SessionList, MessageThread, MessageBubble, MessageInput, AudioContent, FileContent, VoiceRecordButton, ImageModal, PrivateGroupMemberPanel
+│   │   ├── voice/                 # CallButton, ActiveCallBar, IncomingCallModal
 │   │   ├── common/                # ConnectionStatus, CopyableField, UserProfilePanel
 │   │   └── contact/               # ContactEditPanel (with burn-after-read toggle)
-│   ├── hooks/                     # use-ipc-subscriptions (push events)
+│   ├── hooks/                     # use-ipc-subscriptions, use-voice-audio
+│   ├── workers/                   # audio-processor.worklet.ts (AudioWorklet for PCM capture)
 │   └── styles/global.css          # Tailwind + rich-text styles
 ├── shared/                        # Shared between main and renderer
-│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client, Discovery, Bot
+│   ├── types/                     # Message, Contact, Session, Topic, PrivateGroup, Profile, Wallet, Client, Discovery, Bot, Voice
 │   ├── constants.ts               # App constants, burn durations, NKN seed servers
 │   └── ipc-channels.ts            # Typed IPC channel definitions
 ├── preload/index.ts               # contextBridge → typed window.dchat API
 └── tests/                         # 340 unit tests (Vitest)
+
+dchat-tuna/                        # Go sidecar for TUNA voice calls
+├── main.go                        # JSON-RPC over stdin/stdout, TUNA session mgmt
+└── go.mod                         # Go module (nkn-sdk-go, nkn-tuna-session)
 ```
 
 ## Commands
@@ -183,6 +195,7 @@ interface MessageData {
 | `privateGroup:invitation` / `accept` / `subscribe` / `quit` | Private group lifecycle |
 | `privateGroup:optionRequest` / `optionResponse` / `memberRequest` / `memberResponse` | Group sync |
 | `discovery:broadcast` | P2P public group discovery broadcast |
+| `voiceCall:invite` / `accept` / `decline` / `end` | Voice call signaling |
 
 ### IPFS Encryption
 - AES-128-GCM: 16-byte key, 12-byte nonce prepended to ciphertext

@@ -121,4 +121,14 @@ export const IPC = {
     GET: "bot:get",
     DELETE: "bot:delete",
   },
+  VOICE: {
+    START_CALL: "voice:startCall",
+    ACCEPT_CALL: "voice:acceptCall",
+    DECLINE_CALL: "voice:declineCall",
+    END_CALL: "voice:endCall",
+    SEND_AUDIO: "voice:sendAudio",
+    ON_CALL_STATE: "voice:onCallState",
+    ON_AUDIO_DATA: "voice:onAudioData",
+    ON_INCOMING_CALL: "voice:onIncomingCall",
+  },
 } as const;

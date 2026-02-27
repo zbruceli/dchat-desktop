@@ -10,16 +10,26 @@ asarUnpack:
   - "node_modules/@ffmpeg-installer/**"
   - "node_modules/better-sqlite3-multiple-ciphers/**/*.node"
   - "node_modules/sharp/**"
+extraResources:
+  - from: "dchat-tuna/bin/"
+    to: "."
+    filter:
+      - "dchat-tuna*"
 publish:
   provider: github
 mac:
   category: public.app-category.social-networking
   icon: resources/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
   target:
     - dmg
     - zip
+afterSign: scripts/notarize.js
 win:
   icon: resources/icon.png
   target:

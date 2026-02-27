@@ -10,6 +10,8 @@ import { WalletPage } from "./pages/Wallet/WalletPage";
 import { SettingsPage } from "./pages/Settings/SettingsPage";
 import { DiscoverPage } from "./pages/Discover/DiscoverPage";
 import { UserProfilePanel } from "./components/common/UserProfilePanel";
+import { ActiveCallBar } from "./components/voice/ActiveCallBar";
+import { IncomingCallModal } from "./components/voice/IncomingCallModal";
 
 type NavItem = "chat" | "contacts" | "discover" | "wallet" | "settings";
 
@@ -87,6 +89,8 @@ export function App() {
         </ErrorBoundary>
       </main>
       <UserProfilePanel />
+      <ActiveCallBar />
+      <IncomingCallModal />
     </div>
   );
 }

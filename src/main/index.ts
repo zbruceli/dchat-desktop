@@ -27,6 +27,7 @@ import { PrivateGroupRepository } from "./db/repositories/private-group-reposito
 import { PrivateGroupMemberRepository } from "./db/repositories/private-group-member-repository";
 import { DiscoveredGroupRepository } from "./db/repositories/discovered-group-repository";
 import { DiscoveryService } from "./services/discovery-service";
+import { VoiceCallService } from "./services/voice-call-service";
 import {
   registerPreDbHandlers,
   registerPostDbHandlers,
@@ -267,6 +268,10 @@ app.whenReady().then(() => {
     chatService.setDiscoveryService(discoveryService);
     discoveryService.setTopicService(topicService);
 
+    // Voice call service
+    const voiceCallService = new VoiceCallService(nknClient, pushToRenderer, seed);
+    chatService.setVoiceCallService(voiceCallService);
+
     // Wire up desktop notifications
     if (mainWindow) {
       chatService.setMainWindow(mainWindow);
@@ -286,6 +291,7 @@ app.whenReady().then(() => {
       profileService,
       privateGroupService,
       discoveryService,
+      voiceCallService,
       topicRepo,
       walletStorage,
       userDataPath,

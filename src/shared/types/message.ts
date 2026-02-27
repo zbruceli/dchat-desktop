@@ -23,7 +23,11 @@ export type MessageContentType =
   | "privateGroup:memberRequest"
   | "privateGroup:memberResponse"
   | "read"
-  | "discovery:broadcast";
+  | "discovery:broadcast"
+  | "voiceCall:invite"
+  | "voiceCall:accept"
+  | "voiceCall:decline"
+  | "voiceCall:end";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 

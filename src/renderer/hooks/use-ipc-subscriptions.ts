@@ -7,6 +7,7 @@ import { useTopicStore } from "../stores/topic-store";
 import { usePrivateGroupStore } from "../stores/private-group-store";
 import { useProfileStore } from "../stores/profile-store";
 import { useDiscoveryStore } from "../stores/discovery-store";
+import { useVoiceCallStore } from "../stores/voice-call-store";
 
 export function useIpcSubscriptions(): void {
   const setStatus = useClientStore((s) => s.setStatus);
@@ -22,6 +23,8 @@ export function useIpcSubscriptions(): void {
   const setActiveSession = useChatStore((s) => s.setActiveSession);
   const handleMessageBurned = useChatStore((s) => s.handleMessageBurned);
   const handleDiscoveryUpdate = useDiscoveryStore((s) => s.handleDiscoveryUpdate);
+  const handleCallStateUpdate = useVoiceCallStore((s) => s.handleCallStateUpdate);
+  const handleIncomingCall = useVoiceCallStore((s) => s.handleIncomingCall);
 
   useEffect(() => {
     const unsubStatus = window.dchat.client.onStatusChange(setStatus);
@@ -37,6 +40,8 @@ export function useIpcSubscriptions(): void {
     const unsubNavigate = window.dchat.chat.onNavigateToSession(setActiveSession);
     const unsubBurned = window.dchat.chat.onMessageBurned(handleMessageBurned);
     const unsubDiscovery = window.dchat.discovery.onUpdate(handleDiscoveryUpdate);
+    const unsubCallState = window.dchat.voice.onCallState(handleCallStateUpdate);
+    const unsubIncomingCall = window.dchat.voice.onIncomingCall(handleIncomingCall);
 
     return () => {
       unsubStatus();
@@ -52,6 +57,8 @@ export function useIpcSubscriptions(): void {
       unsubNavigate();
       unsubBurned();
       unsubDiscovery();
+      unsubCallState();
+      unsubIncomingCall();
     };
-  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession, handleMessageBurned, handleDiscoveryUpdate]);
+  }, [setStatus, handleIncomingMessage, handleContactUpdate, handleSessionUpdate, handleSessionDelete, handleTopicUpdate, handleTopicDelete, handleGroupUpdate, handleGroupDelete, setProfile, setActiveSession, handleMessageBurned, handleDiscoveryUpdate, handleCallStateUpdate, handleIncomingCall]);
 }
