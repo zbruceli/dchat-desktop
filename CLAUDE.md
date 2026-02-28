@@ -24,7 +24,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - File sharing — Any file up to 100 MB, AES-128-GCM encrypted via IPFS
 - Burn-after-read — Per-contact self-destructing messages (5s–1 week), countdown timer, `contactOptions` wire format, `textExtension` content type
 - Rich text — Auto-detect and render markdown/HTML (react-markdown + DOMPurify)
-- **P2P voice calls** — Real-time voice via NKN TUNA (paid relay), Go sidecar (`dchat-tuna`), PCM audio over stdio JSON-RPC, call signaling via NKN messages (`voiceCall:invite/accept/decline/end`), mic capture via AudioWorklet, mute/unmute, call duration timer
+- **P2P voice calls** — Real-time voice via NKN TUNA (paid relay), Go sidecar (`dchat-tuna`), Opus codec via WebCodecs API (24 kbps, FEC, DTX), call signaling via NKN messages (`voiceCall:invite/accept/decline/end`), mic capture via AudioWorklet, jitter buffer, mute/unmute, call duration timer
 
 ### Group Chat
 - **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported

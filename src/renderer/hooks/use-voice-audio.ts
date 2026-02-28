@@ -4,12 +4,14 @@ import { useVoiceCallStore } from "../stores/voice-call-store";
 /**
  * Hook that manages WebAudio capture and playback for voice calls.
  *
- * Capture: AudioWorklet collects 20ms PCM frames (960 samples @ 48kHz), converts
- * to Int16, sends via IPC to main process → Go sidecar → TUNA relay.
+ * Capture: AudioWorklet collects 20ms PCM frames (960 samples @ 48kHz),
+ * Opus-encodes via WebCodecs AudioEncoder, sends via IPC → Go sidecar → TUNA relay.
  *
- * Playback: Jitter buffer accumulates incoming frames and schedules them for
- * gapless back-to-back playback using AudioContext.currentTime scheduling.
- * This eliminates clicks/gaps from network jitter.
+ * Playback: Incoming Opus frames are decoded via AudioDecoder, then fed into
+ * a jitter buffer for gapless scheduled playback.
+ *
+ * Opus encoding reduces bandwidth from 768 kbps (raw PCM) to ~24 kbps with
+ * built-in FEC for packet loss resilience and DTX for silence suppression.
  */
 
 const FRAME_DURATION = 960 / 48000; // 20ms per frame
@@ -94,7 +96,7 @@ export function useVoiceAudio(): void {
 
     async function setupAudio() {
       try {
-        console.log("[VoiceAudio] Setting up audio pipeline...");
+        console.log("[VoiceAudio] Setting up Opus audio pipeline...");
         // Create AudioContext
         const audioContext = new AudioContext({ sampleRate: 48000 });
         audioContextRef.current = audioContext;
@@ -105,6 +107,53 @@ export function useVoiceAudio(): void {
         jitterBufferRef.current = [];
         bufferingRef.current = true;
         playbackStartedRef.current = false;
+
+        // --- Opus Encoder (capture side) ---
+        let sendCount = 0;
+        const encoder = new AudioEncoder({
+          output: (chunk: EncodedAudioChunk) => {
+            const buf = new ArrayBuffer(chunk.byteLength);
+            chunk.copyTo(buf);
+            sendCount++;
+            if (sendCount <= 5 || sendCount % 50 === 0) {
+              console.log(`[VoiceAudio] Sending Opus frame #${sendCount}, size=${chunk.byteLength}`);
+            }
+            window.dchat.voice.sendAudio(buf);
+          },
+          error: (e) => console.error("[VoiceAudio] Encoder error:", e),
+        });
+
+        encoder.configure({
+          codec: "opus",
+          sampleRate: 48000,
+          numberOfChannels: 1,
+          bitrate: 24000,
+          opus: {
+            frameDuration: 20000,
+            useinbandfec: true,
+            usedtx: true,
+            packetlossperc: 10,
+          },
+        });
+        console.log("[VoiceAudio] Opus encoder configured (24 kbps, VoIP, FEC+DTX)");
+
+        // --- Opus Decoder (playback side) ---
+        const decoder = new AudioDecoder({
+          output: (audioData: AudioData) => {
+            const float32 = new Float32Array(audioData.numberOfFrames);
+            audioData.copyTo(float32, { planeIndex: 0 });
+            audioData.close();
+            playAudioFrame(float32);
+          },
+          error: (e) => console.error("[VoiceAudio] Decoder error:", e),
+        });
+
+        decoder.configure({
+          codec: "opus",
+          sampleRate: 48000,
+          numberOfChannels: 1,
+        });
+        console.log("[VoiceAudio] Opus decoder configured");
 
         // Register worklet — use inline source wrapped in a blob URL to avoid CSP
         // issues with Vite's data: URL inlining in production builds
@@ -146,7 +195,11 @@ registerProcessor("audio-capture-processor", AudioCaptureProcessor);
         URL.revokeObjectURL(workletUrl);
         console.log("[VoiceAudio] Worklet loaded");
 
-        if (cancelled) return;
+        if (cancelled) {
+          encoder.close();
+          decoder.close();
+          return;
+        }
 
         // Get microphone stream
         console.log("[VoiceAudio] Requesting mic access...");
@@ -162,6 +215,8 @@ registerProcessor("audio-capture-processor", AudioCaptureProcessor);
 
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
+          encoder.close();
+          decoder.close();
           return;
         }
 
@@ -169,29 +224,32 @@ registerProcessor("audio-capture-processor", AudioCaptureProcessor);
         console.log("[VoiceAudio] Mic stream acquired, tracks:", stream.getAudioTracks().length);
 
         // Create worklet node for capture
-        const source = audioContext.createMediaStreamSource(stream);
+        const sourceNode = audioContext.createMediaStreamSource(stream);
         const workletNode = new AudioWorkletNode(audioContext, "audio-capture-processor");
         workletNodeRef.current = workletNode;
 
-        let sendCount = 0;
+        // Frame timestamp tracker for AudioData (microseconds)
+        let frameTimestamp = 0;
+
         workletNode.port.onmessage = (event) => {
           if (event.data.type === "pcm-frame") {
             const pcmFrame = event.data.data as Float32Array;
-            // Convert Float32 PCM to Int16 for more efficient transport
-            const int16 = new Int16Array(pcmFrame.length);
-            for (let i = 0; i < pcmFrame.length; i++) {
-              const s = Math.max(-1, Math.min(1, pcmFrame[i]));
-              int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-            }
-            sendCount++;
-            if (sendCount <= 5 || sendCount % 50 === 0) {
-              console.log(`[VoiceAudio] Sending PCM frame #${sendCount}, size=${int16.buffer.byteLength}`);
-            }
-            window.dchat.voice.sendAudio(int16.buffer);
+            // Wrap PCM in AudioData and feed to Opus encoder
+            const audioData = new AudioData({
+              format: "f32-planar",
+              sampleRate: 48000,
+              numberOfFrames: pcmFrame.length,
+              numberOfChannels: 1,
+              timestamp: frameTimestamp,
+              data: pcmFrame.buffer as ArrayBuffer,
+            });
+            encoder.encode(audioData);
+            audioData.close();
+            frameTimestamp += 20000; // 20ms in microseconds
           }
         };
 
-        source.connect(workletNode);
+        sourceNode.connect(workletNode);
         // Don't connect worklet to destination (we don't want to hear ourselves)
         workletNode.connect(audioContext.destination);
         // Actually, disconnect from destination to prevent feedback
@@ -199,32 +257,36 @@ registerProcessor("audio-capture-processor", AudioCaptureProcessor);
 
         // Subscribe to incoming audio data
         let recvCount = 0;
+        let recvTimestamp = 0;
         const unsubAudio = window.dchat.voice.onAudioData((audioData) => {
           if (!audioData?.data) return;
           recvCount++;
           if (recvCount <= 5 || recvCount % 50 === 0) {
-            console.log(`[VoiceAudio] Received audio frame #${recvCount}, size=${audioData.data.length}`);
+            console.log(`[VoiceAudio] Received Opus frame #${recvCount}, size=${audioData.data.length}`);
           }
 
-          // Decode base64 to Int16 PCM, then to Float32
+          // Decode base64 to raw Opus bytes, feed to decoder
           const raw = atob(audioData.data);
           const bytes = new Uint8Array(raw.length);
           for (let i = 0; i < raw.length; i++) {
             bytes[i] = raw.charCodeAt(i);
           }
-          const int16 = new Int16Array(bytes.buffer);
-          const float32 = new Float32Array(int16.length);
-          for (let i = 0; i < int16.length; i++) {
-            float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7fff);
-          }
 
-          playAudioFrame(float32);
+          const chunk = new EncodedAudioChunk({
+            type: "key", // Opus frames are all independently decodable
+            timestamp: recvTimestamp,
+            data: bytes.buffer,
+          });
+          decoder.decode(chunk);
+          recvTimestamp += 20000; // 20ms in microseconds
         });
 
         cleanupRef.current = () => {
           unsubAudio();
+          encoder.close();
+          decoder.close();
           workletNode.disconnect();
-          source.disconnect();
+          sourceNode.disconnect();
           stream.getTracks().forEach((t) => t.stop());
           audioContext.close().catch(console.error);
           audioContextRef.current = null;
