@@ -4,14 +4,17 @@ import { useVoiceCallStore } from "../stores/voice-call-store";
 /**
  * Hook that manages WebAudio capture and playback for voice calls.
  *
- * When the call is connected:
- * - Captures mic audio via AudioWorklet, converts PCM to Opus-like frames, sends via IPC
- * - Receives audio frames from IPC, decodes and plays back via WebAudio
+ * Capture: AudioWorklet collects 20ms PCM frames (960 samples @ 48kHz), converts
+ * to Int16, sends via IPC to main process → Go sidecar → TUNA relay.
  *
- * Note: Since Opus WASM codec adds significant complexity, we use raw PCM (Float32)
- * encoded as base64 for the initial implementation. The Go sidecar handles the
- * length-prefixed framing. For production, an Opus WASM encoder should be added.
+ * Playback: Jitter buffer accumulates incoming frames and schedules them for
+ * gapless back-to-back playback using AudioContext.currentTime scheduling.
+ * This eliminates clicks/gaps from network jitter.
  */
+
+const FRAME_DURATION = 960 / 48000; // 20ms per frame
+const JITTER_BUFFER_MS = 60; // Buffer 60ms (3 frames) before starting playback
+
 export function useVoiceAudio(): void {
   const activeCall = useVoiceCallStore((s) => s.activeCall);
   const isMuted = useVoiceCallStore((s) => s.isMuted);
@@ -19,24 +22,62 @@ export function useVoiceAudio(): void {
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const playbackQueueRef = useRef<Float32Array[]>([]);
-  const isPlayingRef = useRef(false);
-  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
-  // Play received audio frames
+  // Jitter buffer state for scheduled playback
+  const nextPlayTimeRef = useRef(0);
+  const jitterBufferRef = useRef<Float32Array[]>([]);
+  const bufferingRef = useRef(true);
+  const playbackStartedRef = useRef(false);
+
+  // Drain the jitter buffer, scheduling frames for gapless playback
+  const drainBuffer = useCallback(() => {
+    const ctx = audioContextRef.current;
+    if (!ctx || ctx.state === "closed") return;
+
+    const queue = jitterBufferRef.current;
+    while (queue.length > 0) {
+      const pcmData = queue.shift()!;
+      const buffer = ctx.createBuffer(1, pcmData.length, 48000);
+      buffer.getChannelData(0).set(pcmData);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+
+      // Schedule this frame right after the previous one ends
+      const now = ctx.currentTime;
+      if (nextPlayTimeRef.current < now) {
+        // Fallen behind — reset to now (with small lookahead for scheduling)
+        nextPlayTimeRef.current = now + 0.005;
+      }
+      source.start(nextPlayTimeRef.current);
+      nextPlayTimeRef.current += FRAME_DURATION;
+    }
+  }, []);
+
+  // Play received audio frames via jitter buffer
   const playAudioFrame = useCallback((pcmData: Float32Array) => {
     const ctx = audioContextRef.current;
     if (!ctx || ctx.state === "closed") return;
 
-    const buffer = ctx.createBuffer(1, pcmData.length, 48000);
-    buffer.getChannelData(0).set(pcmData);
+    jitterBufferRef.current.push(pcmData);
 
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    source.start();
-  }, []);
+    if (bufferingRef.current) {
+      // Wait until we have enough frames to smooth out jitter
+      const bufferedMs = jitterBufferRef.current.length * FRAME_DURATION * 1000;
+      if (bufferedMs >= JITTER_BUFFER_MS) {
+        bufferingRef.current = false;
+        if (!playbackStartedRef.current) {
+          playbackStartedRef.current = true;
+          console.log(`[VoiceAudio] Jitter buffer ready (${jitterBufferRef.current.length} frames), starting playback`);
+        }
+        drainBuffer();
+      }
+    } else {
+      drainBuffer();
+    }
+  }, [drainBuffer]);
 
   // Set up audio when call connects
   useEffect(() => {
@@ -58,6 +99,12 @@ export function useVoiceAudio(): void {
         const audioContext = new AudioContext({ sampleRate: 48000 });
         audioContextRef.current = audioContext;
         console.log("[VoiceAudio] AudioContext created, state:", audioContext.state);
+
+        // Reset jitter buffer state
+        nextPlayTimeRef.current = 0;
+        jitterBufferRef.current = [];
+        bufferingRef.current = true;
+        playbackStartedRef.current = false;
 
         // Register worklet — use inline source wrapped in a blob URL to avoid CSP
         // issues with Vite's data: URL inlining in production builds
@@ -183,6 +230,7 @@ registerProcessor("audio-capture-processor", AudioCaptureProcessor);
           audioContextRef.current = null;
           streamRef.current = null;
           workletNodeRef.current = null;
+          jitterBufferRef.current = [];
         };
       } catch (err) {
         console.error("[VoiceAudio] Failed to set up audio:", err);
