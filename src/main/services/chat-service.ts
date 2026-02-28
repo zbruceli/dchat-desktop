@@ -9,6 +9,8 @@ import type { PrivateGroupService } from "./private-group-service";
 import { PRIVATE_GROUP_CONTROL_TYPES } from "./private-group-service";
 import type { ContactProfileService } from "./contact-profile-service";
 import type { DiscoveryService } from "./discovery-service";
+import type { VoiceCallService } from "./voice-call-service";
+import { VOICE_CALL_CONTENT_TYPES } from "./voice-call-service";
 import type { MessageRepository } from "../db/repositories/message-repository";
 import type { SessionRepository } from "../db/repositories/session-repository";
 import type { ContactRepository } from "../db/repositories/contact-repository";
@@ -19,6 +21,7 @@ import type {
   MessageOptions,
   SendMessageParams,
   DiscoveryBroadcastMessage,
+  AnnouncementMessage,
 } from "../../shared/types";
 
 // Content types that represent user-visible messages
@@ -43,6 +46,7 @@ export class ChatService {
   private privateGroupService: PrivateGroupService | null = null;
   private contactProfileService: ContactProfileService | null = null;
   private discoveryService: DiscoveryService | null = null;
+  private voiceCallService: VoiceCallService | null = null;
   private mainWindow: BrowserWindow | null = null;
   private activeSessionId: string | null = null;
   private burnSchedulerTimer: ReturnType<typeof setInterval> | null = null;
@@ -127,6 +131,10 @@ export class ChatService {
 
   setDiscoveryService(service: DiscoveryService): void {
     this.discoveryService = service;
+  }
+
+  setVoiceCallService(service: VoiceCallService): void {
+    this.voiceCallService = service;
   }
 
   setMainWindow(win: BrowserWindow): void {
@@ -598,7 +606,21 @@ export class ChatService {
     try {
       raw = JSON.parse(payload);
     } catch {
-      return; // ignore malformed messages
+      // Try base64 decode (nMobile 2026 announcement format)
+      try {
+        const decoded = Buffer.from(payload, "base64").toString("utf-8");
+        raw = JSON.parse(decoded);
+      } catch {
+        return; // truly malformed
+      }
+    }
+
+    // Route nMobile 2026 announcement messages
+    if (raw.type === "announcement" || raw.type === "periodic") {
+      if (this.discoveryService) {
+        this.discoveryService.handleAnnouncementMessage(src, raw as AnnouncementMessage);
+      }
+      return;
     }
 
     // nMobile sends content as object for private group control messages — normalize to JSON string
@@ -631,6 +653,12 @@ export class ChatService {
     // Route discovery broadcasts
     if (contentType === "discovery:broadcast" && this.discoveryService) {
       this.discoveryService.handleIncomingBroadcast(src, raw as DiscoveryBroadcastMessage);
+      return;
+    }
+
+    // Route voice call signaling messages
+    if (VOICE_CALL_CONTENT_TYPES.has(contentType) && this.voiceCallService) {
+      this.voiceCallService.handleSignalingMessage(src, contentType, messageData.content ?? "");
       return;
     }
 

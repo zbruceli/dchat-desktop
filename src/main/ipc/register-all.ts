@@ -10,6 +10,7 @@ import { registerPrivateGroupHandlers } from "./private-group-handlers";
 import { registerDatabaseHandlers } from "./database-handlers";
 import { registerDiscoveryHandlers } from "./discovery-handlers";
 import { registerBotHandlers } from "./bot-handlers";
+import { registerVoiceHandlers } from "./voice-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
 import type { BotWalletStorageService } from "../services/bot-wallet-storage-service";
@@ -21,6 +22,7 @@ import type { TopicService } from "../services/topic-service";
 import type { ProfileService } from "../services/profile-service";
 import type { PrivateGroupService } from "../services/private-group-service";
 import type { DiscoveryService } from "../services/discovery-service";
+import type { VoiceCallService } from "../services/voice-call-service";
 import type { TopicRepository } from "../db/repositories/topic-repository";
 
 export function registerPreDbHandlers(
@@ -43,6 +45,7 @@ export interface PostDbHandlersParams {
   profileService: ProfileService;
   privateGroupService?: PrivateGroupService;
   discoveryService?: DiscoveryService;
+  voiceCallService?: VoiceCallService;
   topicRepo?: TopicRepository;
   walletStorage: WalletStorageService;
   userDataPath: string;
@@ -67,4 +70,7 @@ export function registerPostDbHandlers(
     registerDiscoveryHandlers(params.discoveryService, params.topicRepo);
   }
   registerDatabaseHandlers(params.walletStorage, params.userDataPath);
+  if (params.voiceCallService) {
+    registerVoiceHandlers(params.voiceCallService);
+  }
 }

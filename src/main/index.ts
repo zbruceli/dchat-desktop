@@ -27,11 +27,22 @@ import { PrivateGroupRepository } from "./db/repositories/private-group-reposito
 import { PrivateGroupMemberRepository } from "./db/repositories/private-group-member-repository";
 import { DiscoveredGroupRepository } from "./db/repositories/discovered-group-repository";
 import { DiscoveryService } from "./services/discovery-service";
+import { VoiceCallService } from "./services/voice-call-service";
 import {
   registerPreDbHandlers,
   registerPostDbHandlers,
 } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
+
+// Prevent EPIPE on stdout/stderr from crashing the app (happens in dev with concurrently)
+process.stdout?.on("error", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "EPIPE") return;
+  throw err;
+});
+process.stderr?.on("error", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "EPIPE") return;
+  throw err;
+});
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -58,6 +69,13 @@ function createWindow(): BrowserWindow {
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../renderer/index.html"));
   }
+
+  // Forward renderer console to main process stdout for debugging
+  mainWindow.webContents.on("console-message", (_event, level, message) => {
+    if (message.includes("Voice") || message.includes("Audio") || message.includes("worklet") || message.includes("getUserMedia")) {
+      console.log(`[renderer] ${message}`);
+    }
+  });
 
   // Open external links in the system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -267,6 +285,10 @@ app.whenReady().then(() => {
     chatService.setDiscoveryService(discoveryService);
     discoveryService.setTopicService(topicService);
 
+    // Voice call service
+    const voiceCallService = new VoiceCallService(nknClient, pushToRenderer, seed);
+    chatService.setVoiceCallService(voiceCallService);
+
     // Wire up desktop notifications
     if (mainWindow) {
       chatService.setMainWindow(mainWindow);
@@ -286,6 +308,7 @@ app.whenReady().then(() => {
       profileService,
       privateGroupService,
       discoveryService,
+      voiceCallService,
       topicRepo,
       walletStorage,
       userDataPath,

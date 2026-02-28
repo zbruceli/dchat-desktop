@@ -13,6 +13,7 @@ import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
 import { ContactEditPanel } from "../contact/ContactEditPanel";
+import { CallButton } from "../voice/CallButton";
 
 function SubscriberPanel({
   topicName,
@@ -364,6 +365,9 @@ export function MessageThread() {
               </div>
             )}
           </div>
+          {isDirect && (
+            <CallButton targetAddress={session.targetAddress} />
+          )}
           {isDirect && (() => {
             const c = contacts.find((c) => c.address === session.targetAddress);
             const burnSec = c?.burnAfterSeconds ?? 0;

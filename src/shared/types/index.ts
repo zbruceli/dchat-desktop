@@ -27,6 +27,13 @@ export { PrivateGroupItemPerm } from "./private-group";
 
 export type { Profile } from "./profile";
 
-export type { DiscoveredGroup, DiscoveryBroadcastMessage } from "./discovery";
+export type { DiscoveredGroup, DiscoveryBroadcastMessage, AnnouncementMessage, AnnouncementGroup } from "./discovery";
 
 export type { BotWalletInfo } from "./bot";
+
+export type {
+  CallState,
+  VoiceCallSignal,
+  VoiceCallStateUpdate,
+  IncomingCallInfo,
+} from "./voice";

@@ -11,6 +11,8 @@ import type {
   PrivateGroupMember,
   DiscoveredGroup,
   BotWalletInfo,
+  VoiceCallStateUpdate,
+  IncomingCallInfo,
 } from "../shared/types";
 
 const api = {
@@ -283,6 +285,36 @@ const api = {
       ipcRenderer.invoke("bot:get"),
     delete: (): Promise<void> =>
       ipcRenderer.invoke("bot:delete"),
+  },
+  voice: {
+    startCall: (targetAddress: string): Promise<void> =>
+      ipcRenderer.invoke("voice:startCall", targetAddress),
+    acceptCall: (callId: string): Promise<void> =>
+      ipcRenderer.invoke("voice:acceptCall", callId),
+    declineCall: (callId: string): Promise<void> =>
+      ipcRenderer.invoke("voice:declineCall", callId),
+    endCall: (): Promise<void> =>
+      ipcRenderer.invoke("voice:endCall"),
+    sendAudio: (data: ArrayBuffer): Promise<void> =>
+      ipcRenderer.invoke("voice:sendAudio", data),
+    onCallState: (callback: (state: VoiceCallStateUpdate | null) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: VoiceCallStateUpdate | null) =>
+        callback(state);
+      ipcRenderer.on("voice:onCallState", handler);
+      return () => ipcRenderer.removeListener("voice:onCallState", handler);
+    },
+    onAudioData: (callback: (data: { callId: string; data: string }) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { callId: string; data: string }) =>
+        callback(data);
+      ipcRenderer.on("voice:onAudioData", handler);
+      return () => ipcRenderer.removeListener("voice:onAudioData", handler);
+    },
+    onIncomingCall: (callback: (call: IncomingCallInfo | null) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, call: IncomingCallInfo | null) =>
+        callback(call);
+      ipcRenderer.on("voice:onIncomingCall", handler);
+      return () => ipcRenderer.removeListener("voice:onIncomingCall", handler);
+    },
   },
 };
 
