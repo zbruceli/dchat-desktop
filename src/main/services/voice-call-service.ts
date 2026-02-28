@@ -208,19 +208,29 @@ export class VoiceCallService extends EventEmitter {
       throw new Error("A call is already active");
     }
 
-    if (!this.sidecarReady) {
-      await this.start();
-    }
-
     const callId = crypto.randomUUID();
 
+    // Show "Ringing" in UI immediately — don't wait for sidecar
     this.activeCall = {
       callId,
       remoteAddress: targetAddress,
       state: "ringing",
     };
-
     this.pushCallState();
+
+    // Ensure sidecar is ready (may take seconds for init + listen + getPubAddrs)
+    try {
+      if (!this.sidecarReady) {
+        await this.start();
+      }
+    } catch (err) {
+      console.error("[VoiceCall] Sidecar start failed:", err);
+      this.endCallInternal("sidecar start failed");
+      return;
+    }
+
+    // Bail if call was ended while sidecar was starting
+    if (!this.activeCall || this.activeCall.callId !== callId) return;
 
     // Send invite via NKN signaling (include our TUNA pubAddrs so remote can pre-cache them)
     const signal: VoiceCallSignal = {
@@ -457,6 +467,11 @@ export class VoiceCallService extends EventEmitter {
       this.pushCallState();
     }
     this.activeCall = null;
+    this.audioSendCount = 0;
+
+    // Stop sidecar so next call starts fresh in the correct mode (caller vs callee)
+    this.stop().catch(console.error);
+    this.cachedPubAddrs = null;
   }
 
   private pushCallState(): void {

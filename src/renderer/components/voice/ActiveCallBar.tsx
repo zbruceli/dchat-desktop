@@ -3,6 +3,7 @@ import { useVoiceCallStore } from "../../stores/voice-call-store";
 import { useContactStore } from "../../stores/contact-store";
 import { truncateAddress } from "../../utils/address";
 import { useVoiceAudio } from "../../hooks/use-voice-audio";
+import { useRingtone } from "../../hooks/use-ringtone";
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -21,6 +22,15 @@ export function ActiveCallBar() {
 
   // Initialize voice audio pipeline
   useVoiceAudio();
+
+  // Play ringing tone while in "ringing" state
+  const ringtone = useRingtone();
+  useEffect(() => {
+    if (activeCall?.state === "ringing") {
+      ringtone.start();
+      return () => ringtone.stop();
+    }
+  }, [activeCall?.state]);
 
   // Timer for call duration
   useEffect(() => {

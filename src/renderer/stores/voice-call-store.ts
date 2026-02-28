@@ -22,16 +22,27 @@ interface VoiceCallState {
   handleIncomingCall: (call: IncomingCallInfo | null) => void;
 }
 
+let endedTimerId: ReturnType<typeof setTimeout> | null = null;
+
+function clearEndedTimer() {
+  if (endedTimerId) {
+    clearTimeout(endedTimerId);
+    endedTimerId = null;
+  }
+}
+
 export const useVoiceCallStore = create<VoiceCallState>((set, get) => ({
   activeCall: null,
   incomingCall: null,
   isMuted: false,
 
   startCall: async (targetAddress: string) => {
+    clearEndedTimer();
     await window.dchat.voice.startCall(targetAddress);
   },
 
   acceptCall: async (callId: string) => {
+    clearEndedTimer();
     await window.dchat.voice.acceptCall(callId);
     set({ incomingCall: null });
   },
@@ -42,6 +53,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => ({
   },
 
   endCall: async () => {
+    clearEndedTimer();
     await window.dchat.voice.endCall();
     set({ activeCall: null, isMuted: false });
   },
@@ -52,9 +64,20 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => ({
 
   handleCallStateUpdate: (update: VoiceCallStateUpdate | null) => {
     if (!update) {
+      clearEndedTimer();
       set({ activeCall: null, isMuted: false });
       return;
     }
+
+    // Auto-dismiss after 5s when call ends
+    if (update.state === "ended") {
+      clearEndedTimer();
+      endedTimerId = setTimeout(() => {
+        endedTimerId = null;
+        set({ activeCall: null, isMuted: false });
+      }, 5000);
+    }
+
     set({
       activeCall: {
         callId: update.callId,

@@ -1,13 +1,23 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useVoiceCallStore } from "../../stores/voice-call-store";
 import { useContactStore } from "../../stores/contact-store";
 import { truncateAddress } from "../../utils/address";
+import { useRingtone } from "../../hooks/use-ringtone";
 
 export function IncomingCallModal() {
   const incomingCall = useVoiceCallStore((s) => s.incomingCall);
   const acceptCall = useVoiceCallStore((s) => s.acceptCall);
   const declineCall = useVoiceCallStore((s) => s.declineCall);
   const contacts = useContactStore((s) => s.contacts);
+
+  // Play ringing tone while modal is visible
+  const ringtone = useRingtone();
+  useEffect(() => {
+    if (incomingCall) {
+      ringtone.start();
+      return () => ringtone.stop();
+    }
+  }, [!!incomingCall]);
 
   if (!incomingCall) return null;
 
