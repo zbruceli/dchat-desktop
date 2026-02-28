@@ -4,6 +4,8 @@ Decentralized, end-to-end encrypted desktop messenger built on the [NKN](https:/
 
 D-Chat Desktop is an Electron port of [nMobile](https://github.com/nknorg/nMobile), bringing private, serverless messaging to macOS, Windows, and Linux.
 
+![D-Chat Desktop features](dchat-desktop-features.gif)
+
 ## Downloads
 
 Pre-built binaries for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
@@ -32,6 +34,7 @@ You ──(encrypted)──► NKN Relay Network ──(encrypted)──► Reci
 - [x] **File sharing** — Any file type up to 100 MB, encrypted via IPFS, open with system default app
 - [x] **Burn-after-read** — Per-contact self-destructing messages (5s to 1 week), countdown timer on bubbles, nMobile-compatible
 - [x] **Rich text** — Automatic markdown and HTML rendering with styled headings, blockquotes, code blocks, links
+- [x] **P2P voice calls** — Real-time calls via NKN TUNA relay, Opus codec (24 kbps), mute/unmute, call duration timer
 - [ ] **Video sharing** — Video media type via IPFS
 
 ### Group Chat
@@ -149,7 +152,8 @@ See `SECURITY_AUDIT.md` for the full audit report.
 | 3 | Group chat — Public topics, private groups | Complete |
 | 4 | Wallet & polish — NKN wallet, notifications, profile sync | Complete |
 | 5 | Security hardening — SQLCipher, safeStorage, audit | Complete |
-| 6 | Audio-video call, multi-device sync, name service | Planned |
+| 6 | Voice calls — P2P via NKN TUNA relay | Complete |
+| 7 | Video calls, multi-device sync, name service | Planned |
 
 ## Acknowledgments
 
