@@ -53,17 +53,22 @@ export function useVoiceAudio(): void {
 
     async function setupAudio() {
       try {
+        console.log("[VoiceAudio] Setting up audio pipeline...");
         // Create AudioContext
         const audioContext = new AudioContext({ sampleRate: 48000 });
         audioContextRef.current = audioContext;
+        console.log("[VoiceAudio] AudioContext created, state:", audioContext.state);
 
         // Register worklet
         const workletUrl = new URL("../workers/audio-processor.worklet.ts", import.meta.url);
+        console.log("[VoiceAudio] Loading worklet from:", workletUrl.href);
         await audioContext.audioWorklet.addModule(workletUrl.href);
+        console.log("[VoiceAudio] Worklet loaded");
 
         if (cancelled) return;
 
         // Get microphone stream
+        console.log("[VoiceAudio] Requesting mic access...");
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             sampleRate: 48000,
@@ -80,12 +85,14 @@ export function useVoiceAudio(): void {
         }
 
         streamRef.current = stream;
+        console.log("[VoiceAudio] Mic stream acquired, tracks:", stream.getAudioTracks().length);
 
         // Create worklet node for capture
         const source = audioContext.createMediaStreamSource(stream);
         const workletNode = new AudioWorkletNode(audioContext, "audio-capture-processor");
         workletNodeRef.current = workletNode;
 
+        let sendCount = 0;
         workletNode.port.onmessage = (event) => {
           if (event.data.type === "pcm-frame") {
             const pcmFrame = event.data.data as Float32Array;
@@ -94,6 +101,10 @@ export function useVoiceAudio(): void {
             for (let i = 0; i < pcmFrame.length; i++) {
               const s = Math.max(-1, Math.min(1, pcmFrame[i]));
               int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            sendCount++;
+            if (sendCount <= 5 || sendCount % 50 === 0) {
+              console.log(`[VoiceAudio] Sending PCM frame #${sendCount}, size=${int16.buffer.byteLength}`);
             }
             window.dchat.voice.sendAudio(int16.buffer);
           }
@@ -106,8 +117,13 @@ export function useVoiceAudio(): void {
         workletNode.disconnect(audioContext.destination);
 
         // Subscribe to incoming audio data
+        let recvCount = 0;
         const unsubAudio = window.dchat.voice.onAudioData((audioData) => {
           if (!audioData?.data) return;
+          recvCount++;
+          if (recvCount <= 5 || recvCount % 50 === 0) {
+            console.log(`[VoiceAudio] Received audio frame #${recvCount}, size=${audioData.data.length}`);
+          }
 
           // Decode base64 to Int16 PCM, then to Float32
           const raw = atob(audioData.data);

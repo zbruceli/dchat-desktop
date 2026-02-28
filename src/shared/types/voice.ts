@@ -4,6 +4,7 @@ export interface VoiceCallSignal {
   callId: string;
   codec: "opus";
   sampleRate: number;
+  tunaPubAddrs?: string; // JSON-encoded TUNA PubAddrs for direct relay connection
 }
 
 export interface VoiceCallStateUpdate {

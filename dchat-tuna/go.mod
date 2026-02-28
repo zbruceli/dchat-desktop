@@ -9,6 +9,8 @@ require (
 	github.com/nknorg/tuna v0.1.0
 )
 
+replace github.com/nknorg/nkn-tuna-session v0.2.6 => ./nkn-tuna-session
+
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect

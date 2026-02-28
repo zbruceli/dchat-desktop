@@ -32,6 +32,7 @@ GitHub Actions builds the app for all three platforms on every tag push (`v*.*.*
 - Gatekeeper passes without user workaround
 - App is notarized by Apple (malware scanned)
 - Hardened runtime enforced
+- Distribution via GitHub Releases (direct download) — no App Store needed, avoids sandboxing restrictions
 
 **electron-builder config additions:**
 ```yaml
@@ -68,18 +69,23 @@ afterSign: scripts/notarize.js
 ### Phase 3: Windows Code Signing
 
 **Option A: Azure Trusted Signing** (recommended, cheapest)
-- Azure subscription + Trusted Signing resource ($9.99/month)
-- Identity validation (organization or individual)
+- Azure subscription + Trusted Signing resource ($9.99/month, ~$120/year)
+- Microsoft-trusted signature → SmartScreen warning disappears immediately (no reputation building)
+- Identity validation required (may take days)
+- **Eligibility**: Individual developers in US and Canada only (as of 2025). Other countries paused
 - electron-builder has built-in support via `win.azureSignOptions`
 
-**Option B: SSL.com EV Certificate**
-- EV code signing certificate (~$350+/year)
-- Requires hardware token (USB) or cloud signing
-- Immediate SmartScreen reputation (EV certs bypass SmartScreen from day one)
+**Option B: OV Certificate** (~$200–350/year)
+- Providers: SSL.com (~$65–200/yr), DigiCert (~$420/yr), Sectigo
+- **Important**: Since Aug 2024, neither OV nor EV certificates bypass SmartScreen instantly. Reputation builds over time (weeks to months of downloads). You can submit to Microsoft for manual review to speed it up
+- CA/B Forum mandates FIPS 140-2 hardware token (e.g., YubiKey) or cloud signing service (e.g., SSL.com eSigner at ~$20/month extra)
+- More expensive and slower than Azure Trusted Signing
 
-**Option C: OV Certificate**
-- Standard code signing certificate (~$200+/year)
-- SmartScreen reputation builds over time (users may see warnings initially)
+**Option C: Microsoft Store** (secondary channel)
+- One-time $19 registration fee, bypasses SmartScreen
+- Electron apps can be published as unpackaged Win32 apps
+- Not recommended as primary strategy — more complex packaging process
+- Consider as secondary distribution channel after DIY signing is in place
 
 **GitHub Actions secrets needed (Azure Trusted Signing):**
 | Secret | Description |
@@ -89,6 +95,15 @@ afterSign: scripts/notarize.js
 | `AZURE_CLIENT_SECRET` | Azure AD app registration secret |
 | `AZURE_CODE_SIGNING_ACCOUNT` | Trusted Signing account name |
 | `AZURE_CERT_PROFILE` | Certificate profile name |
+
+**electron-builder config additions (Azure Trusted Signing):**
+```yaml
+win:
+  azureSignOptions:
+    endpoint: https://eus.codesigning.azure.net
+    certificateProfileName: ${env.AZURE_CERT_PROFILE}
+    codeSigningAccountName: ${env.AZURE_CODE_SIGNING_ACCOUNT}
+```
 
 ### Phase 4: Auto-Update
 
@@ -255,3 +270,25 @@ npx electron-rebuild -f -w sharp
 - Check that `package.json` version matches the git tag
 - Ensure native module dependencies are available for the target platform
 - Review the workflow logs for specific error messages
+
+## Alternatives Considered
+
+### Third-Party Platform: ToDesktop
+- Managed service handling code signing, packaging, distribution, and auto-updates for Electron apps
+- Uses their own EV Microsoft Authenticode + Apple Gatekeeper certificates
+- Pricing: ~$12–58/month ($144–696/year)
+- **Not recommended**: More expensive than DIY, potential issues with native modules (SQLCipher, sharp, ffmpeg), vendor lock-in, loss of signing identity control
+
+### Mac App Store
+- Same $99/year Apple Developer Program, but requires sandboxing
+- **Not recommended**: Sandboxing would break SQLCipher direct file access, ffmpeg subprocess spawning, and possibly `safeStorage`. Architecture is incompatible
+
+## References
+
+- [Apple Developer Program](https://developer.apple.com/programs/) — $99/year
+- [Azure Trusted Signing Pricing](https://azure.microsoft.com/en-us/pricing/details/artifact-signing/) — $9.99/month
+- [Azure Trusted Signing for Individual Developers](https://techcommunity.microsoft.com/blog/microsoft-security-blog/trusted-signing-is-now-open-for-individual-developers-to-sign-up-in-public-previ/4273554)
+- [Electron Code Signing Guide](https://www.electronjs.org/docs/latest/tutorial/code-signing)
+- [SmartScreen Reputation with OV/EV Certificates](https://learn.microsoft.com/en-us/answers/questions/417016/reputation-with-ov-certificates-and-are-ev-certifi)
+- [Authenticode in 2025 — Azure Trusted Signing](https://textslashplain.com/2025/03/12/authenticode-in-2025-azure-trusted-signing/)
+- [Publishing Mac App Outside App Store](https://www.dolthub.com/blog/2024-10-22-how-to-publish-a-mac-desktop-app-outside-the-app-store/)

@@ -34,12 +34,12 @@ type Response struct {
 
 // Unsolicited event pushed to Electron main process
 type Event struct {
-	Event     string `json:"event"`
-	SessionID string `json:"sessionId,omitempty"`
-	Data      string `json:"data,omitempty"`
+	Event      string `json:"event"`
+	SessionID  string `json:"sessionId,omitempty"`
+	Data       string `json:"data,omitempty"`
 	RemoteAddr string `json:"remoteAddr,omitempty"`
-	Reason    string `json:"reason,omitempty"`
-	Message   string `json:"message,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Message    string `json:"message,omitempty"`
 }
 
 // Active TUNA session
@@ -52,15 +52,16 @@ type ActiveSession struct {
 
 // Server manages the TUNA session lifecycle
 type Server struct {
-	mu          sync.Mutex
-	account     *nkn.Account
-	wallet      *nkn.Wallet
-	tunaSession *ts.TunaSessionClient
-	sessions    map[string]*ActiveSession
-	maxPrice    string
-	writer      *json.Encoder
-	writerMu    sync.Mutex
-	listening   bool
+	mu           sync.Mutex
+	account      *nkn.Account
+	wallet       *nkn.Wallet
+	multiClient  *nkn.MultiClient
+	tunaSession  *ts.TunaSessionClient
+	sessions     map[string]*ActiveSession
+	maxPrice     string
+	writer       *json.Encoder
+	writerMu     sync.Mutex
+	listening    bool
 	pendingConns chan net.Conn
 }
 
@@ -84,7 +85,7 @@ func (s *Server) sendEvent(evt Event) {
 	_ = s.writer.Encode(evt)
 }
 
-// init: Initialize NKN account and TUNA session client
+// init: Initialize NKN account, MultiClient, and TUNA session client
 func (s *Server) handleInit(id int, params json.RawMessage) {
 	var p struct {
 		Seed     string `json:"seed"`
@@ -96,7 +97,7 @@ func (s *Server) handleInit(id int, params json.RawMessage) {
 	}
 
 	if p.MaxPrice == "" {
-		p.MaxPrice = "0.01"
+		p.MaxPrice = "0.001"
 	}
 	s.maxPrice = p.MaxPrice
 
@@ -107,28 +108,42 @@ func (s *Server) handleInit(id int, params json.RawMessage) {
 	}
 	s.account = account
 
-	wallet, err := nkn.NewWallet(account, nkn.GetDefaultWalletConfig())
+	wallet, err := nkn.NewWallet(account, nil)
 	if err != nil {
-		// Non-fatal: wallet for balance check only
 		log.Printf("Warning: failed to create wallet: %v", err)
 	}
 	s.wallet = wallet
 
-	// Create TUNA session client
-	clientConfig := nkn.GetDefaultClientConfig()
-	clientConfig.ConnectRetries = 1
+	// Create NKN MultiClient — match example: ConnectRetries=1
+	clientConfig := &nkn.ClientConfig{ConnectRetries: 1}
 
-	tsConfig := &ts.Config{
-		NumTunaListeners:      4,
-		TunaMaxPrice:          s.maxPrice,
-		TunaDialTimeout:       10000,
-		TunaNanoPayFee:        "0",
-		TunaServiceName:       "dchat-voice",
-		SessionConfig:         &ncp.Config{MTU: int32(1300)},
-		TunaIPFilter:          &geo.IPFilter{},
+	multiClient, err := nkn.NewMultiClient(account, "dchat-tuna", 4, false, clientConfig)
+	if err != nil {
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("failed to create NKN client: %v", err)})
+		return
+	}
+	s.multiClient = multiClient
+
+	// Wait for NKN client to connect
+	select {
+	case <-multiClient.OnConnect.C:
+		log.Printf("NKN client connected: %s", multiClient.Addr().String())
+	case <-time.After(30 * time.Second):
+		multiClient.Close()
+		s.sendResponse(Response{ID: id, Error: "NKN client connect timeout"})
+		return
 	}
 
-	tunaSession, err := ts.NewTunaSessionClient(account, nil, nil, tsConfig)
+	// Create TUNA session client — match example pattern closely
+	tsConfig := &ts.Config{
+		NumTunaListeners: 1,
+		TunaMaxPrice:     s.maxPrice,
+		TunaIPFilter:     &geo.IPFilter{},
+		SessionConfig:    &ncp.Config{MTU: int32(1300)},
+		Verbose:          true,
+	}
+
+	tunaSession, err := ts.NewTunaSessionClient(account, multiClient, wallet, tsConfig)
 	if err != nil {
 		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("failed to create TUNA session: %v", err)})
 		return
@@ -136,45 +151,6 @@ func (s *Server) handleInit(id int, params json.RawMessage) {
 	s.tunaSession = tunaSession
 
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
-}
-
-// dial: Connect to a remote peer via TUNA
-func (s *Server) handleDial(id int, params json.RawMessage) {
-	var p struct {
-		RemoteAddr string `json:"remoteAddr"`
-	}
-	if err := json.Unmarshal(params, &p); err != nil {
-		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid params: %v", err)})
-		return
-	}
-
-	if s.tunaSession == nil {
-		s.sendResponse(Response{ID: id, Error: "not initialized"})
-		return
-	}
-
-	conn, err := s.tunaSession.Dial(p.RemoteAddr)
-	if err != nil {
-		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("dial failed: %v", err)})
-		return
-	}
-
-	sessionID := fmt.Sprintf("call-%d", time.Now().UnixNano())
-	session := &ActiveSession{
-		ID:         sessionID,
-		RemoteAddr: p.RemoteAddr,
-		Conn:       conn,
-		Done:       make(chan struct{}),
-	}
-
-	s.mu.Lock()
-	s.sessions[sessionID] = session
-	s.mu.Unlock()
-
-	// Start reading audio data from the connection
-	go s.readLoop(session)
-
-	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"sessionId": sessionID}})
 }
 
 // listen: Start listening for incoming TUNA sessions
@@ -198,10 +174,9 @@ func (s *Server) handleListen(id int) {
 		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("listen failed: %v", err)})
 		return
 	}
+	log.Printf("Listening at %s", s.tunaSession.Addr())
 
-	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
-
-	// Accept connections in background
+	// Start Accept loop BEFORE waiting for OnConnect (matches example pattern)
 	go func() {
 		for {
 			conn, err := s.tunaSession.Accept()
@@ -212,6 +187,7 @@ func (s *Server) handleListen(id int) {
 
 			sessionID := fmt.Sprintf("call-%d", time.Now().UnixNano())
 			remoteAddr := conn.RemoteAddr().String()
+			log.Printf("Accepted session %s from %s", sessionID, remoteAddr)
 
 			session := &ActiveSession{
 				ID:         sessionID,
@@ -231,10 +207,63 @@ func (s *Server) handleListen(id int) {
 				RemoteAddr: remoteAddr,
 			})
 
-			// Start reading audio immediately (caller starts sending after accept)
+			// Start reading audio immediately
 			go s.readLoop(session)
 		}
 	}()
+
+	// Wait for TUNA relay connections — BLOCK until ready (matches example)
+	log.Printf("Waiting for TUNA relay connections...")
+	select {
+	case <-s.tunaSession.OnConnect():
+		log.Printf("TUNA listener ready (relay connections established)")
+	case <-time.After(120 * time.Second):
+		log.Printf("Warning: TUNA OnConnect timed out after 120s")
+	}
+
+	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
+}
+
+// dial: Connect to a remote peer via TUNA
+func (s *Server) handleDial(id int, params json.RawMessage) {
+	var p struct {
+		RemoteAddr string `json:"remoteAddr"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid params: %v", err)})
+		return
+	}
+
+	if s.tunaSession == nil {
+		s.sendResponse(Response{ID: id, Error: "not initialized"})
+		return
+	}
+
+	log.Printf("Dialing TUNA to %s ...", p.RemoteAddr)
+	dialConfig := &nkn.DialConfig{DialTimeout: 30000}
+	session, err := s.tunaSession.DialWithConfig(p.RemoteAddr, dialConfig)
+	if err != nil {
+		log.Printf("Dial to %s failed: %v", p.RemoteAddr, err)
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("dial failed: %v", err)})
+		return
+	}
+	log.Printf("Dial to %s succeeded", p.RemoteAddr)
+
+	sessionID := fmt.Sprintf("call-%d", time.Now().UnixNano())
+	activeSession := &ActiveSession{
+		ID:         sessionID,
+		RemoteAddr: p.RemoteAddr,
+		Conn:       session,
+		Done:       make(chan struct{}),
+	}
+
+	s.mu.Lock()
+	s.sessions[sessionID] = activeSession
+	s.mu.Unlock()
+
+	go s.readLoop(activeSession)
+
+	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"sessionId": sessionID}})
 }
 
 // accept: Accept a pending incoming session (already accepted at transport level)
@@ -345,6 +374,95 @@ func (s *Server) handleGetBalance(id int) {
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"balance": balance.String()}})
 }
 
+// testNkn: Test NKN connectivity to a remote address
+func (s *Server) handleTestNkn(id int, params json.RawMessage) {
+	var p struct {
+		RemoteAddr string `json:"remoteAddr"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid params: %v", err)})
+		return
+	}
+
+	if s.multiClient == nil {
+		s.sendResponse(Response{ID: id, Error: "not initialized"})
+		return
+	}
+
+	log.Printf("Testing NKN send to %s ...", p.RemoteAddr)
+	onReply, err := s.multiClient.Send(
+		nkn.NewStringArray(p.RemoteAddr),
+		[]byte("ping"),
+		nil,
+	)
+	if err != nil {
+		log.Printf("NKN send to %s failed: %v", p.RemoteAddr, err)
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("send failed: %v", err)})
+		return
+	}
+
+	select {
+	case reply := <-onReply.C:
+		if reply != nil {
+			log.Printf("NKN reply from %s: %d bytes", p.RemoteAddr, len(reply.Data))
+			s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true, "replyBytes": len(reply.Data)}})
+		} else {
+			log.Printf("NKN reply from %s: nil", p.RemoteAddr)
+			s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true, "reply": "nil"}})
+		}
+	case <-time.After(15 * time.Second):
+		log.Printf("NKN send to %s: no reply in 15s", p.RemoteAddr)
+		s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": false, "reason": "no reply in 15s"}})
+	}
+}
+
+// getPubAddrs: Get this client's TUNA public addresses for diagnostic
+func (s *Server) handleGetPubAddrs(id int) {
+	if s.tunaSession == nil {
+		s.sendResponse(Response{ID: id, Error: "not initialized"})
+		return
+	}
+
+	pubAddrs := s.tunaSession.GetPubAddrs()
+	if pubAddrs == nil {
+		log.Printf("GetPubAddrs: nil (no TUNA exits)")
+		s.sendResponse(Response{ID: id, Result: map[string]interface{}{"addrs": nil}})
+		return
+	}
+
+	// Serialize to JSON for logging
+	buf, _ := json.Marshal(pubAddrs)
+	log.Printf("GetPubAddrs: %s", string(buf))
+	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"addrs": json.RawMessage(buf)}})
+}
+
+// setPubAddrs: Pre-cache remote TUNA relay addresses (bypasses broken Go-to-Go NKN messaging)
+func (s *Server) handleSetPubAddrs(id int, params json.RawMessage) {
+	var p struct {
+		RemoteAddr string `json:"remoteAddr"`
+		PubAddrs   string `json:"pubAddrs"` // JSON-encoded PubAddrs from remote via JS NKN signaling
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid params: %v", err)})
+		return
+	}
+
+	if s.tunaSession == nil {
+		s.sendResponse(Response{ID: id, Error: "not initialized"})
+		return
+	}
+
+	pubAddrs := &ts.PubAddrs{}
+	if err := json.Unmarshal([]byte(p.PubAddrs), pubAddrs); err != nil {
+		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid pubAddrs JSON: %v", err)})
+		return
+	}
+
+	log.Printf("SetPubAddrs for %s: %s", p.RemoteAddr, p.PubAddrs)
+	s.tunaSession.SetCachedPubAddrs(p.RemoteAddr, pubAddrs)
+	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
+}
+
 // shutdown: Clean up all sessions and exit
 func (s *Server) handleShutdown(id int) {
 	s.mu.Lock()
@@ -359,7 +477,6 @@ func (s *Server) handleShutdown(id int) {
 
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
 
-	// Give response time to flush
 	time.Sleep(100 * time.Millisecond)
 	os.Exit(0)
 }
@@ -378,7 +495,6 @@ func (s *Server) readLoop(session *ActiveSession) {
 		default:
 		}
 
-		// Read 2-byte length prefix
 		_, err := io.ReadFull(reader, header)
 		if err != nil {
 			if err != io.EOF {
@@ -393,7 +509,7 @@ func (s *Server) readLoop(session *ActiveSession) {
 
 		frameLen := int(header[0])<<8 | int(header[1])
 		if frameLen == 0 || frameLen > 32000 {
-			continue // skip invalid frames
+			continue
 		}
 
 		frame := make([]byte, frameLen)
@@ -402,7 +518,6 @@ func (s *Server) readLoop(session *ActiveSession) {
 			return
 		}
 
-		// Send audio data to Electron
 		s.sendEvent(Event{
 			Event:     "audioData",
 			SessionID: session.ID,
@@ -425,7 +540,6 @@ func (s *Server) closeSessionLocked(sessionID string, reason string) {
 
 	select {
 	case <-session.Done:
-		// already closed
 	default:
 		close(session.Done)
 	}
@@ -464,12 +578,12 @@ func hexToBytes(hex string) []byte {
 }
 
 func main() {
-	log.SetOutput(os.Stderr) // Keep stderr for debug logs, stdout for JSON-RPC
+	log.SetOutput(os.Stderr)
 	log.SetPrefix("[dchat-tuna] ")
 
 	server := NewServer(os.Stdout)
 	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1MB max line
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -495,12 +609,17 @@ func main() {
 		case "reject":
 			go server.handleReject(req.ID, req.Params)
 		case "sendAudio":
-			// sendAudio is hot path — handle synchronously to maintain order
 			server.handleSendAudio(req.ID, req.Params)
 		case "hangup":
 			go server.handleHangup(req.ID, req.Params)
 		case "getBalance":
 			go server.handleGetBalance(req.ID)
+		case "testNkn":
+			go server.handleTestNkn(req.ID, req.Params)
+		case "getPubAddrs":
+			go server.handleGetPubAddrs(req.ID)
+		case "setPubAddrs":
+			go server.handleSetPubAddrs(req.ID, req.Params)
 		case "shutdown":
 			go server.handleShutdown(req.ID)
 		default:

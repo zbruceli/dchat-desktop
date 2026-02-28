@@ -60,6 +60,13 @@ function createWindow(): BrowserWindow {
     mainWindow.loadFile(path.join(__dirname, "../../renderer/index.html"));
   }
 
+  // Forward renderer console to main process stdout for debugging
+  mainWindow.webContents.on("console-message", (_event, level, message) => {
+    if (message.includes("Voice") || message.includes("Audio") || message.includes("worklet") || message.includes("getUserMedia")) {
+      console.log(`[renderer] ${message}`);
+    }
+  });
+
   // Open external links in the system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) {
