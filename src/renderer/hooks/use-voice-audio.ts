@@ -59,10 +59,44 @@ export function useVoiceAudio(): void {
         audioContextRef.current = audioContext;
         console.log("[VoiceAudio] AudioContext created, state:", audioContext.state);
 
-        // Register worklet
-        const workletUrl = new URL("../workers/audio-processor.worklet.ts", import.meta.url);
-        console.log("[VoiceAudio] Loading worklet from:", workletUrl.href);
-        await audioContext.audioWorklet.addModule(workletUrl.href);
+        // Register worklet — use inline source wrapped in a blob URL to avoid CSP
+        // issues with Vite's data: URL inlining in production builds
+        const workletSource = `
+class AudioCaptureProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.frameSize = 960;
+    this.buffer = new Float32Array(this.frameSize);
+    this.writePos = 0;
+  }
+  process(inputs, _outputs, _parameters) {
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+    const channelData = input[0];
+    if (!channelData) return true;
+    let readPos = 0;
+    while (readPos < channelData.length) {
+      const remaining = this.frameSize - this.writePos;
+      const available = channelData.length - readPos;
+      const toCopy = Math.min(remaining, available);
+      this.buffer.set(channelData.subarray(readPos, readPos + toCopy), this.writePos);
+      this.writePos += toCopy;
+      readPos += toCopy;
+      if (this.writePos >= this.frameSize) {
+        this.port.postMessage({ type: "pcm-frame", data: this.buffer.slice() });
+        this.writePos = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("audio-capture-processor", AudioCaptureProcessor);
+`;
+        const workletBlob = new Blob([workletSource], { type: "application/javascript" });
+        const workletUrl = URL.createObjectURL(workletBlob);
+        console.log("[VoiceAudio] Loading worklet from blob URL");
+        await audioContext.audioWorklet.addModule(workletUrl);
+        URL.revokeObjectURL(workletUrl);
         console.log("[VoiceAudio] Worklet loaded");
 
         if (cancelled) return;

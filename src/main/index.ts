@@ -34,6 +34,16 @@ import {
 } from "./ipc/register-all";
 import { IPC } from "../shared/ipc-channels";
 
+// Prevent EPIPE on stdout/stderr from crashing the app (happens in dev with concurrently)
+process.stdout?.on("error", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "EPIPE") return;
+  throw err;
+});
+process.stderr?.on("error", (err) => {
+  if ((err as NodeJS.ErrnoException).code === "EPIPE") return;
+  throw err;
+});
+
 let mainWindow: BrowserWindow | null = null;
 
 const isDev = !app.isPackaged;

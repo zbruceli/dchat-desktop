@@ -42,7 +42,7 @@ const VOICE_CALL_CONTENT_TYPES = new Set([
 ]);
 
 const MIN_BALANCE_NKN = 1;
-const MAX_PRICE_PER_MB = "0.001";
+const MAX_PRICE_PER_MB = "0.01";
 
 export { VOICE_CALL_CONTENT_TYPES };
 
@@ -70,9 +70,58 @@ export class VoiceCallService extends EventEmitter {
     this.seed = seed;
   }
 
+  /** Start sidecar as caller: init + listen + getPubAddrs (caller listens for incoming dial) */
   async start(): Promise<void> {
     if (this.sidecar) return;
+    await this.spawnSidecar();
 
+    // Initialize the sidecar with the same NKN seed (same account/pubkey)
+    await this.sendCommand("init", {
+      seed: this.seed,
+      maxPrice: MAX_PRICE_PER_MB,
+    });
+
+    // Caller listens for incoming TUNA sessions (callee will dial us)
+    await this.sendCommand("listen", {});
+    this.sidecarReady = true;
+
+    // Fetch and cache our TUNA pubAddrs for signaling exchange (must complete before calls)
+    // Retry because relay connection may still be establishing after listen returns
+    for (let attempt = 0; attempt < 15; attempt++) {
+      try {
+        const r = await this.sendCommand("getPubAddrs", {});
+        const addrs = r.addrs;
+        if (addrs) {
+          this.cachedPubAddrs = JSON.stringify(addrs);
+          console.log("[VoiceCall] Our TUNA pubAddrs:", this.cachedPubAddrs);
+          break;
+        }
+        console.warn(`[VoiceCall] No TUNA pubAddrs yet (attempt ${attempt + 1}/15)`);
+      } catch (e) {
+        console.error(`[VoiceCall] getPubAddrs failed (attempt ${attempt + 1}/15):`, e);
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    if (!this.cachedPubAddrs) {
+      console.error("[VoiceCall] Failed to get TUNA pubAddrs after all retries");
+    }
+  }
+
+  /** Start sidecar as callee: init only (callee will dial the caller, no listen needed) */
+  async startForDial(): Promise<void> {
+    if (this.sidecar) return;
+    await this.spawnSidecar();
+
+    await this.sendCommand("init", {
+      seed: this.seed,
+      maxPrice: MAX_PRICE_PER_MB,
+    });
+
+    this.sidecarReady = true;
+    console.log("[VoiceCall] Sidecar ready for dial (callee mode, no listen)");
+  }
+
+  private async spawnSidecar(): Promise<void> {
     const binaryName = process.platform === "win32" ? "dchat-tuna.exe" : "dchat-tuna";
     const binaryPath = app.isPackaged
       ? path.join(process.resourcesPath, binaryName)
@@ -81,6 +130,11 @@ export class VoiceCallService extends EventEmitter {
     this.sidecar = spawn(binaryPath, [], {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
+    });
+
+    // Prevent EPIPE from becoming an uncaught exception when sidecar exits
+    this.sidecar.stdin?.on("error", (err) => {
+      console.warn("[VoiceCall] Sidecar stdin error:", err.message);
     });
 
     this.sidecar.stdout?.on("data", (chunk: Buffer) => {
@@ -106,37 +160,6 @@ export class VoiceCallService extends EventEmitter {
         this.endCallInternal("sidecar exited");
       }
     });
-
-    // Initialize the sidecar with the same NKN seed (same account/pubkey)
-    await this.sendCommand("init", {
-      seed: this.seed,
-      maxPrice: MAX_PRICE_PER_MB,
-    });
-
-    // Start listening for incoming TUNA sessions
-    await this.sendCommand("listen", {});
-    this.sidecarReady = true;
-
-    // Fetch and cache our TUNA pubAddrs for signaling exchange (must complete before calls)
-    // Retry because relay connection may still be establishing after listen returns
-    for (let attempt = 0; attempt < 15; attempt++) {
-      try {
-        const r = await this.sendCommand("getPubAddrs", {});
-        const addrs = r.addrs;
-        if (addrs) {
-          this.cachedPubAddrs = JSON.stringify(addrs);
-          console.log("[VoiceCall] Our TUNA pubAddrs:", this.cachedPubAddrs);
-          break;
-        }
-        console.warn(`[VoiceCall] No TUNA pubAddrs yet (attempt ${attempt + 1}/15)`);
-      } catch (e) {
-        console.error(`[VoiceCall] getPubAddrs failed (attempt ${attempt + 1}/15):`, e);
-      }
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    if (!this.cachedPubAddrs) {
-      console.error("[VoiceCall] Failed to get TUNA pubAddrs after all retries");
-    }
   }
 
   async stop(): Promise<void> {
@@ -218,18 +241,14 @@ export class VoiceCallService extends EventEmitter {
     // Stay in "ringing" state — TUNA dial happens after remote accepts
   }
 
-  /** Accept an incoming call */
+  /** Accept an incoming call (callee: init sidecar, send accept, then dial caller) */
   async acceptCall(callId: string): Promise<void> {
     if (!this.incomingCall || this.incomingCall.callId !== callId) {
       throw new Error("No matching incoming call");
     }
 
-    // Ensure sidecar is running and cachedPubAddrs is populated before sending accept
-    if (!this.sidecarReady) {
-      await this.start();
-    }
-
     const remoteAddress = this.incomingCall.remoteAddress;
+    const callerPubAddrs = this.incomingCall.tunaPubAddrs;
 
     this.activeCall = {
       callId,
@@ -239,12 +258,16 @@ export class VoiceCallService extends EventEmitter {
     this.incomingCall = null;
     this.pushCallState();
 
-    // Send accept via NKN signaling (include our TUNA pubAddrs so caller can pre-cache them)
+    // Start sidecar in dial-only mode (no listen, no getPubAddrs — callee doesn't need them)
+    if (!this.sidecarReady) {
+      await this.startForDial();
+    }
+
+    // Send accept via NKN signaling (no pubAddrs needed — caller already has its own)
     const signal: VoiceCallSignal = {
       callId,
       codec: "opus",
       sampleRate: 48000,
-      tunaPubAddrs: this.cachedPubAddrs ?? undefined,
     };
 
     this.nknClient.sendMessageNoReply(remoteAddress, JSON.stringify({
@@ -254,21 +277,23 @@ export class VoiceCallService extends EventEmitter {
       timestamp: Date.now(),
     }));
 
-    // Link pending TUNA session if it arrived before accept
-    if (this.pendingTunaSessionId) {
-      this.activeCall.tunaSessionId = this.pendingTunaSessionId;
-      this.pendingTunaSessionId = null;
-      console.log(`[VoiceCall] Linked pending TUNA session to call ${callId}`);
-    }
+    // Dial the caller's TUNA address using their pubAddrs
+    if (callerPubAddrs) {
+      const callerTunaAddr = `dchat-tuna.${remoteAddress}`;
+      console.log(`[VoiceCall] Setting caller pubAddrs for ${callerTunaAddr}`);
+      try {
+        await this.sendCommand("setPubAddrs", {
+          remoteAddr: callerTunaAddr,
+          pubAddrs: callerPubAddrs,
+        });
+      } catch (e) {
+        console.error("[VoiceCall] setPubAddrs failed:", e);
+      }
 
-    // Mark connected if we already have a TUNA session, otherwise wait for "incoming" event
-    if (this.activeCall.tunaSessionId) {
-      this.activeCall.state = "connected";
-      this.activeCall.startedAt = Date.now();
-      this.pushCallState();
+      this.dialTuna(callId, remoteAddress);
     } else {
-      console.log("[VoiceCall] Waiting for TUNA session from caller...");
-      // Will transition to "connected" when "incoming" TUNA event arrives
+      console.error("[VoiceCall] No caller pubAddrs available — cannot dial");
+      this.endCallInternal("no caller pubAddrs");
     }
   }
 
@@ -349,54 +374,31 @@ export class VoiceCallService extends EventEmitter {
       return;
     }
 
-    // Pre-cache caller's TUNA pubAddrs so our sidecar can dial them without Go-to-Go NKN messaging
-    if (signal.tunaPubAddrs) {
-      const callerTunaAddr = `dchat-tuna.${src}`;
-      console.log(`[VoiceCall] Pre-caching caller pubAddrs for ${callerTunaAddr}`);
-      this.sendCommand("setPubAddrs", {
-        remoteAddr: callerTunaAddr,
-        pubAddrs: signal.tunaPubAddrs,
-      }).catch(e => console.error("[VoiceCall] setPubAddrs failed:", e));
-    }
-
+    // Store caller's TUNA pubAddrs — callee will use them to dial after accepting
     this.incomingCall = {
       callId: signal.callId,
       remoteAddress: src,
+      tunaPubAddrs: signal.tunaPubAddrs,
     };
 
+    console.log(`[VoiceCall] Incoming invite from ${src.substring(0, 8)}..., tunaPubAddrs=${!!signal.tunaPubAddrs}`);
     this.pushToRenderer(IPC.VOICE.ON_INCOMING_CALL, this.incomingCall);
   }
 
-  private async handleRemoteAccept(_src: string, signal: VoiceCallSignal): Promise<void> {
+  private handleRemoteAccept(_src: string, signal: VoiceCallSignal): void {
     if (!this.activeCall || this.activeCall.callId !== signal.callId) return;
 
-    console.log(`[VoiceCall] Remote accepted call. tunaPubAddrs present: ${!!signal.tunaPubAddrs}`);
-    if (signal.tunaPubAddrs) {
-      console.log(`[VoiceCall] Callee pubAddrs: ${signal.tunaPubAddrs}`);
+    // If TUNA session already arrived (callee's dial beat NKN accept signal), go straight to connected
+    if (this.activeCall.tunaSessionId) {
+      console.log(`[VoiceCall] Remote accepted — TUNA session already linked, connected`);
+      this.activeCall.state = "connected";
+      this.activeCall.startedAt = Date.now();
+      this.pushCallState();
+    } else {
+      console.log(`[VoiceCall] Remote accepted — waiting for callee's TUNA dial`);
+      this.activeCall.state = "connecting";
+      this.pushCallState();
     }
-
-    const callId = this.activeCall.callId;
-    const targetAddress = this.activeCall.remoteAddress;
-
-    // Remote accepted — now dial TUNA for the data channel
-    this.activeCall.state = "connecting";
-    this.pushCallState();
-
-    // Pre-cache callee's TUNA pubAddrs so DialWithConfig skips broken Go-to-Go NKN messaging
-    if (signal.tunaPubAddrs) {
-      const calleeTunaAddr = `dchat-tuna.${targetAddress}`;
-      console.log(`[VoiceCall] Pre-caching callee pubAddrs for ${calleeTunaAddr}`);
-      try {
-        await this.sendCommand("setPubAddrs", {
-          remoteAddr: calleeTunaAddr,
-          pubAddrs: signal.tunaPubAddrs,
-        });
-      } catch (e) {
-        console.error("[VoiceCall] setPubAddrs failed:", e);
-      }
-    }
-
-    this.dialTuna(callId, targetAddress);
   }
 
   private async dialTuna(callId: string, targetAddress: string): Promise<void> {
@@ -483,7 +485,7 @@ export class VoiceCallService extends EventEmitter {
     }
 
     // Handle responses to pending requests
-    if (msg.id !== undefined && this.pendingRequests.has(msg.id)) {
+    if (msg.id !== undefined && msg.id !== 0 && this.pendingRequests.has(msg.id)) {
       const pending = this.pendingRequests.get(msg.id)!;
       this.pendingRequests.delete(msg.id);
       if (msg.error) {
@@ -491,6 +493,12 @@ export class VoiceCallService extends EventEmitter {
       } else {
         pending.resolve(msg.result ?? {});
       }
+      return;
+    }
+
+    // Log unmatched responses with errors (e.g. from fire-and-forget commands)
+    if (msg.id !== undefined && !msg.event && msg.error) {
+      console.error(`[VoiceCall] Unmatched sidecar error (id=${msg.id}): ${msg.error}`);
       return;
     }
 
@@ -503,7 +511,7 @@ export class VoiceCallService extends EventEmitter {
             // Call already accepted via NKN signaling — link this TUNA session
             this.activeCall.tunaSessionId = msg.sessionId;
             console.log(`[VoiceCall] Linked TUNA session ${msg.sessionId} to call ${this.activeCall.callId}`);
-            if (this.activeCall.state === "connecting") {
+            if (this.activeCall.state === "ringing" || this.activeCall.state === "connecting") {
               this.activeCall.state = "connected";
               this.activeCall.startedAt = Date.now();
               this.pushCallState();
@@ -574,16 +582,25 @@ export class VoiceCallService extends EventEmitter {
         reject: (err) => { clearTimeout(timer); originalReject(err); },
       });
 
-      this.sidecar.stdin.write(JSON.stringify(req) + "\n");
+      try {
+        this.sidecar.stdin.write(JSON.stringify(req) + "\n");
+      } catch (err) {
+        this.pendingRequests.delete(id);
+        clearTimeout(timer);
+        reject(new Error(`Sidecar write failed: ${err}`));
+      }
     });
   }
 
   private sendCommandNoWait(method: string, params: Record<string, unknown>): void {
     if (!this.sidecar?.stdin?.writable) return;
 
-    const id = ++this.requestId;
-    const req: SidecarRequest = { id, method, params };
-    this.sidecar.stdin.write(JSON.stringify(req) + "\n");
-    // Don't track response — fire and forget
+    // Use id=0 to signal Go sidecar not to send any response
+    const req: SidecarRequest = { id: 0, method, params };
+    try {
+      this.sidecar.stdin.write(JSON.stringify(req) + "\n");
+    } catch {
+      // Sidecar already exited — silently drop
+    }
   }
 }

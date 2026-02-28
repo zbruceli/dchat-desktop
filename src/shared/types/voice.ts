@@ -17,4 +17,5 @@ export interface VoiceCallStateUpdate {
 export interface IncomingCallInfo {
   callId: string;
   remoteAddress: string;
+  tunaPubAddrs?: string; // Caller's TUNA pubAddrs for callee to dial
 }

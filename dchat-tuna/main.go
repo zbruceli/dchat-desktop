@@ -48,6 +48,7 @@ type ActiveSession struct {
 	RemoteAddr string
 	Conn       net.Conn
 	Done       chan struct{}
+	WriteCh    chan []byte // Serialized write channel — prevents concurrent Conn.Write
 }
 
 // Server manages the TUNA session lifecycle
@@ -97,7 +98,7 @@ func (s *Server) handleInit(id int, params json.RawMessage) {
 	}
 
 	if p.MaxPrice == "" {
-		p.MaxPrice = "0.001"
+		p.MaxPrice = "0.01"
 	}
 	s.maxPrice = p.MaxPrice
 
@@ -189,12 +190,7 @@ func (s *Server) handleListen(id int) {
 			remoteAddr := conn.RemoteAddr().String()
 			log.Printf("Accepted session %s from %s", sessionID, remoteAddr)
 
-			session := &ActiveSession{
-				ID:         sessionID,
-				RemoteAddr: remoteAddr,
-				Conn:       conn,
-				Done:       make(chan struct{}),
-			}
+			session := s.createSession(sessionID, remoteAddr, conn)
 
 			s.mu.Lock()
 			s.sessions[sessionID] = session
@@ -207,7 +203,8 @@ func (s *Server) handleListen(id int) {
 				RemoteAddr: remoteAddr,
 			})
 
-			// Start reading audio immediately
+			// Start writer and reader goroutines
+			go s.writeLoop(session)
 			go s.readLoop(session)
 		}
 	}()
@@ -241,7 +238,7 @@ func (s *Server) handleDial(id int, params json.RawMessage) {
 
 	log.Printf("Dialing TUNA to %s ...", p.RemoteAddr)
 	dialConfig := &nkn.DialConfig{DialTimeout: 30000}
-	session, err := s.tunaSession.DialWithConfig(p.RemoteAddr, dialConfig)
+	conn, err := s.tunaSession.DialWithConfig(p.RemoteAddr, dialConfig)
 	if err != nil {
 		log.Printf("Dial to %s failed: %v", p.RemoteAddr, err)
 		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("dial failed: %v", err)})
@@ -250,18 +247,23 @@ func (s *Server) handleDial(id int, params json.RawMessage) {
 	log.Printf("Dial to %s succeeded", p.RemoteAddr)
 
 	sessionID := fmt.Sprintf("call-%d", time.Now().UnixNano())
-	activeSession := &ActiveSession{
-		ID:         sessionID,
-		RemoteAddr: p.RemoteAddr,
-		Conn:       session,
-		Done:       make(chan struct{}),
-	}
+	session := s.createSession(sessionID, p.RemoteAddr, conn)
 
 	s.mu.Lock()
-	s.sessions[sessionID] = activeSession
+	s.sessions[sessionID] = session
 	s.mu.Unlock()
 
-	go s.readLoop(activeSession)
+	// Start writer and reader goroutines
+	go s.writeLoop(session)
+	go s.readLoop(session)
+
+	// Send a connectivity test frame (zero-length payload = ping)
+	log.Printf("Sending connectivity ping on session %s", sessionID)
+	select {
+	case session.WriteCh <- []byte{0, 0}:
+	default:
+		log.Printf("Warning: WriteCh full, could not send ping")
+	}
 
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"sessionId": sessionID}})
 }
@@ -302,15 +304,14 @@ func (s *Server) handleReject(id int, params json.RawMessage) {
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
 }
 
-// sendAudio: Send audio data over a TUNA session
+// sendAudio: Queue audio data for serialized writing (fire-and-forget, no response)
 func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 	var p struct {
 		SessionID string `json:"sessionId"`
 		Data      string `json:"data"` // base64-encoded Opus frame
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
-		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid params: %v", err)})
-		return
+		return // silently drop malformed
 	}
 
 	s.mu.Lock()
@@ -318,14 +319,12 @@ func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 	s.mu.Unlock()
 
 	if !exists {
-		s.sendResponse(Response{ID: id, Error: "session not found"})
-		return
+		return // session gone, silently drop
 	}
 
 	data, err := base64.StdEncoding.DecodeString(p.Data)
 	if err != nil {
-		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("invalid base64: %v", err)})
-		return
+		return // silently drop
 	}
 
 	// Frame format: 2-byte big-endian length prefix + payload
@@ -334,14 +333,53 @@ func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 	frame[1] = byte(len(data))
 	copy(frame[2:], data)
 
-	_, err = session.Conn.Write(frame)
-	if err != nil {
-		s.sendResponse(Response{ID: id, Error: fmt.Sprintf("write failed: %v", err)})
-		s.closeSession(p.SessionID, "write error")
-		return
+	// Queue for serialized writing — non-blocking to avoid stalling stdin reader
+	select {
+	case session.WriteCh <- frame:
+	default:
+		// Channel full — drop frame (backpressure)
+		log.Printf("Warning: WriteCh full for session %s, dropping audio frame", p.SessionID)
 	}
+	// NO response sent — fire and forget
+}
 
-	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
+// writeLoop drains the WriteCh and writes frames serially to session.Conn
+func (s *Server) writeLoop(session *ActiveSession) {
+	log.Printf("writeLoop started for session %s", session.ID)
+	writeCount := 0
+
+	for {
+		select {
+		case <-session.Done:
+			log.Printf("writeLoop %s: done after %d writes", session.ID, writeCount)
+			return
+		case frame, ok := <-session.WriteCh:
+			if !ok {
+				log.Printf("writeLoop %s: channel closed after %d writes", session.ID, writeCount)
+				return
+			}
+
+			session.Conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			_, err := session.Conn.Write(frame)
+			session.Conn.SetWriteDeadline(time.Time{})
+
+			if err != nil {
+				log.Printf("writeLoop %s: write error after %d writes: %v", session.ID, writeCount, err)
+				s.sendEvent(Event{
+					Event:     "error",
+					SessionID: session.ID,
+					Message:   fmt.Sprintf("audio write failed: %v", err),
+				})
+				s.closeSession(session.ID, "write error")
+				return
+			}
+
+			writeCount++
+			if writeCount <= 3 || writeCount%200 == 0 {
+				log.Printf("writeLoop %s: wrote frame #%d, size=%d", session.ID, writeCount, len(frame))
+			}
+		}
+	}
 }
 
 // hangup: Close an active session
@@ -481,12 +519,25 @@ func (s *Server) handleShutdown(id int) {
 	os.Exit(0)
 }
 
+// createSession builds an ActiveSession with a write channel
+func (s *Server) createSession(id, remoteAddr string, conn net.Conn) *ActiveSession {
+	return &ActiveSession{
+		ID:         id,
+		RemoteAddr: remoteAddr,
+		Conn:       conn,
+		Done:       make(chan struct{}),
+		WriteCh:    make(chan []byte, 256), // buffer ~5s of audio at 50fps
+	}
+}
+
 // readLoop reads length-prefixed audio frames from a session and emits events
 func (s *Server) readLoop(session *ActiveSession) {
 	defer s.closeSession(session.ID, "connection closed")
+	log.Printf("readLoop started for session %s", session.ID)
 
 	reader := bufio.NewReaderSize(session.Conn, 64*1024)
 	header := make([]byte, 2)
+	frameCount := 0
 
 	for {
 		select {
@@ -497,6 +548,7 @@ func (s *Server) readLoop(session *ActiveSession) {
 
 		_, err := io.ReadFull(reader, header)
 		if err != nil {
+			log.Printf("readLoop %s: read error after %d frames: %v", session.ID, frameCount, err)
 			if err != io.EOF {
 				s.sendEvent(Event{
 					Event:     "error",
@@ -508,14 +560,27 @@ func (s *Server) readLoop(session *ActiveSession) {
 		}
 
 		frameLen := int(header[0])<<8 | int(header[1])
-		if frameLen == 0 || frameLen > 32000 {
+
+		// Zero-length frame = connectivity ping — log and skip
+		if frameLen == 0 {
+			log.Printf("readLoop %s: received connectivity ping!", session.ID)
+			continue
+		}
+		if frameLen > 32000 {
+			log.Printf("readLoop %s: skipping invalid frame len=%d", session.ID, frameLen)
 			continue
 		}
 
 		frame := make([]byte, frameLen)
 		_, err = io.ReadFull(reader, frame)
 		if err != nil {
+			log.Printf("readLoop %s: frame body read error after %d frames: %v", session.ID, frameCount, err)
 			return
+		}
+
+		frameCount++
+		if frameCount <= 3 || frameCount%100 == 0 {
+			log.Printf("readLoop %s: received frame #%d, size=%d", session.ID, frameCount, frameLen)
 		}
 
 		s.sendEvent(Event{
