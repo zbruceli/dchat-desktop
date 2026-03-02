@@ -26,10 +26,11 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
+  notarize:
+    teamId: ${env.APPLE_TEAM_ID}
   target:
     - dmg
     - zip
-afterSign: scripts/notarize.js
 win:
   icon: resources/icon.png
   target:
