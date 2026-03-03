@@ -11,6 +11,7 @@ import { registerDatabaseHandlers } from "./database-handlers";
 import { registerDiscoveryHandlers } from "./discovery-handlers";
 import { registerBotHandlers } from "./bot-handlers";
 import { registerVoiceHandlers } from "./voice-handlers";
+import { registerImageHandlers } from "./image-handlers";
 import type { NknClientService } from "../services/nkn-client-service";
 import type { WalletStorageService } from "../services/wallet-storage-service";
 import type { BotWalletStorageService } from "../services/bot-wallet-storage-service";
@@ -34,6 +35,7 @@ export function registerPreDbHandlers(
   registerClientHandlers(nknClient);
   registerWalletHandlers(nknClient, walletStorage, initServices);
   registerBotHandlers(botWalletStorage);
+  registerImageHandlers();
 }
 
 export interface PostDbHandlersParams {

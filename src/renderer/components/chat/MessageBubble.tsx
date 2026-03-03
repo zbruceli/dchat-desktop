@@ -74,7 +74,7 @@ function ImageContent({ message }: { message: Message }) {
           onClick={() => setShowModal(true)}
           onError={() => setLoadError(true)}
         />
-        {showModal && <ImageModal src={src} onClose={() => setShowModal(false)} />}
+        {showModal && <ImageModal src={src} localFilePath={message.localFilePath!} onClose={() => setShowModal(false)} />}
       </>
     );
   }

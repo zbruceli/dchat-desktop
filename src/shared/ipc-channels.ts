@@ -121,6 +121,10 @@ export const IPC = {
     GET: "bot:get",
     DELETE: "bot:delete",
   },
+  IMAGE: {
+    COPY: "image:copy",
+    SAVE: "image:save",
+  },
   VOICE: {
     START_CALL: "voice:startCall",
     ACCEPT_CALL: "voice:acceptCall",

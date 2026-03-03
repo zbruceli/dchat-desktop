@@ -286,6 +286,12 @@ const api = {
     delete: (): Promise<void> =>
       ipcRenderer.invoke("bot:delete"),
   },
+  image: {
+    copy: (filePath: string): Promise<void> =>
+      ipcRenderer.invoke("image:copy", filePath),
+    save: (filePath: string): Promise<{ success: boolean; filePath?: string }> =>
+      ipcRenderer.invoke("image:save", filePath),
+  },
   voice: {
     startCall: (targetAddress: string): Promise<void> =>
       ipcRenderer.invoke("voice:startCall", targetAddress),
