@@ -49,7 +49,9 @@ function hasEncryptionKeys(message: Message): boolean {
 
 /** Build a dchat-media:// URL from a local cache file path */
 function cacheUrl(localPath: string): string {
-  return `dchat-media://image-cache/${localPath.split("/image-cache/").pop()}`;
+  // Normalize backslashes for Windows paths
+  const normalized = localPath.replace(/\\/g, "/");
+  return `dchat-media://image-cache/${normalized.split("/image-cache/").pop()}`;
 }
 
 function ImageContent({ message }: { message: Message }) {

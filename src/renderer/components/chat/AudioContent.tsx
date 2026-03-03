@@ -23,7 +23,9 @@ function formatDuration(seconds: number): string {
 
 /** Build a dchat-media:// URL from a local cache file path */
 function audioCacheUrl(localPath: string): string {
-  return `dchat-media://audio-cache/${localPath.split("/audio-cache/").pop()}`;
+  // Normalize backslashes for Windows paths
+  const normalized = localPath.replace(/\\/g, "/");
+  return `dchat-media://audio-cache/${normalized.split("/audio-cache/").pop()}`;
 }
 
 export function AudioContent({ message }: AudioContentProps) {
