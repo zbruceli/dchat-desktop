@@ -411,17 +411,63 @@ function AnnouncementContent({ announcement }: { announcement: AnnouncementMessa
   );
 }
 
+/** Split text into segments of plain text and clickable URL links */
+function linkifyText(text: string): React.ReactNode[] {
+  const urlRegex = /(https?:\/\/[^\s<>"')\]]+)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const url = match[1];
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:opacity-80 break-all"
+        onClick={(e) => { e.preventDefault(); window.open(url, "_blank"); }}
+      >
+        {url}
+      </a>,
+    );
+    lastIndex = urlRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+/** Wrap bare URLs in CommonMark angle-bracket autolinks for markdown rendering */
+function autoLinkUrls(text: string): string {
+  return text.replace(/((?<!\(|<)https?:\/\/[^\s<>"')\]]+)/g, "<$1>");
+}
+
+/** Wrap bare URLs in <a> tags for HTML content (skip URLs already inside href/src attributes) */
+function linkifyHtmlUrls(html: string): string {
+  return html.replace(/((?<!="|=')https?:\/\/[^\s<>"')\]]+)/g, '<a href="$1">$1</a>');
+}
+
 /** Render text content with markdown/HTML detection */
 function TextContent({ content, isOutbound }: { content: string; isOutbound: boolean }) {
   const hasHtml = useMemo(() => containsHtml(content), [content]);
   const hasMd = useMemo(() => containsMarkdown(content), [content]);
 
-  if (hasHtml) return <HtmlContent content={content} isOutbound={isOutbound} />;
-  if (hasMd) return <MarkdownContent content={content} isOutbound={isOutbound} />;
+  if (hasHtml) return <HtmlContent content={linkifyHtmlUrls(content)} isOutbound={isOutbound} />;
+  if (hasMd) return <MarkdownContent content={autoLinkUrls(content)} isOutbound={isOutbound} />;
+
+  const linked = linkifyText(content);
 
   return (
     <p className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${isOutbound ? "text-white" : "text-text-primary"}`}>
-      {content}
+      {linked}
     </p>
   );
 }
