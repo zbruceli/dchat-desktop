@@ -139,7 +139,7 @@ export class VoiceCallService extends EventEmitter {
 
     this.sidecar.stdout?.on("data", (chunk: Buffer) => {
       this.lineBuffer += chunk.toString();
-      const lines = this.lineBuffer.split("\n");
+      const lines = this.lineBuffer.split(/\r?\n/);
       this.lineBuffer = lines.pop() ?? "";
       for (const line of lines) {
         if (line.trim()) {

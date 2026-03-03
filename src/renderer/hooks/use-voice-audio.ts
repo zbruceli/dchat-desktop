@@ -102,6 +102,21 @@ export function useVoiceAudio(): void {
         audioContextRef.current = audioContext;
         console.log("[VoiceAudio] AudioContext created, state:", audioContext.state);
 
+        // On Windows, AudioContext may start suspended — resume it explicitly
+        if (audioContext.state === "suspended") {
+          console.log("[VoiceAudio] AudioContext suspended, resuming...");
+          await audioContext.resume();
+          console.log("[VoiceAudio] AudioContext resumed, state:", audioContext.state);
+        }
+
+        // Auto-resume if AudioContext gets suspended mid-call
+        audioContext.onstatechange = () => {
+          console.log("[VoiceAudio] AudioContext state changed to:", audioContext.state);
+          if (audioContext.state === "suspended") {
+            audioContext.resume().catch(console.error);
+          }
+        };
+
         // Reset jitter buffer state
         nextPlayTimeRef.current = 0;
         jitterBufferRef.current = [];
