@@ -1,6 +1,6 @@
 {
   "name": "dchat-desktop",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "D-Chat Desktop — Decentralized encrypted messaging over NKN",
   "main": "dist/main/main/index.js",
   "author": {
