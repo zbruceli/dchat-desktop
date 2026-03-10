@@ -25,6 +25,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - Burn-after-read — Per-contact self-destructing messages (5s–1 week), countdown timer, `contactOptions` wire format, `textExtension` content type
 - Rich text — Auto-detect and render markdown/HTML (react-markdown + DOMPurify)
 - **P2P voice calls** — Real-time voice via NKN TUNA (paid relay), Go sidecar (`dchat-tuna`), Opus codec via WebCodecs API (24 kbps, FEC, DTX), call signaling via NKN messages (`voiceCall:invite/accept/decline/end`), mic capture via AudioWorklet, jitter buffer, mute/unmute, call duration timer
+- **P2P video calls** — VP8 codec via WebCodecs API (500 kbps, 640x480 @ 15fps), multiplexed with audio over same TUNA session (type-byte framing: `0x01`=audio, `0x02`=video), camera capture via `MediaStreamTrackProcessor`, local preview (mirrored PiP) + remote playback via `<canvas>`, keyframe-gated decoding with auto-recovery, encoder backpressure monitoring, mid-call camera toggle (`voiceCall:videoToggle` signaling), real-time stats panel (resolution, FPS, bitrate, dropped frames), full-screen video overlay UI
 
 ### Group Chat
 - **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported
@@ -56,7 +57,7 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 - Regenerate and delete with confirmation dialogs
 
 ### Not Yet Built
-- Video sharing
+- Video sharing (file-based)
 - ETH wallet / ERC-20
 - Multi-device sync
 - Erasure coding (piece splitting)
@@ -100,7 +101,7 @@ src/
 │   │   ├── session-service.ts     # Session CRUD
 │   │   ├── profile-service.ts     # Avatar + nickname persistence
 │   │   ├── contact-profile-service.ts # Profile exchange with nMobile
-│   │   ├── voice-call-service.ts     # TUNA sidecar lifecycle, call state machine, signaling
+│   │   ├── voice-call-service.ts     # TUNA sidecar lifecycle, call state machine, voice+video signaling
 │   │   ├── wallet-storage-service.ts  # wallet.json + safeStorage
 │   │   └── bot-wallet-storage-service.ts # bot-wallet.json + safeStorage
 │   ├── db/
@@ -120,7 +121,7 @@ src/
 │   │   ├── voice/                 # CallButton, ActiveCallBar, IncomingCallModal
 │   │   ├── common/                # ConnectionStatus, CopyableField, UserProfilePanel
 │   │   └── contact/               # ContactEditPanel (with burn-after-read toggle)
-│   ├── hooks/                     # use-ipc-subscriptions, use-voice-audio
+│   ├── hooks/                     # use-ipc-subscriptions, use-voice-audio, use-video
 │   ├── workers/                   # audio-processor.worklet.ts (AudioWorklet for PCM capture)
 │   └── styles/global.css          # Tailwind + rich-text styles
 ├── shared/                        # Shared between main and renderer
@@ -130,8 +131,8 @@ src/
 ├── preload/index.ts               # contextBridge → typed window.dchat API
 └── tests/                         # 340 unit tests (Vitest)
 
-dchat-tuna/                        # Go sidecar for TUNA voice calls
-├── main.go                        # JSON-RPC over stdin/stdout, TUNA session mgmt
+dchat-tuna/                        # Go sidecar for TUNA voice/video calls
+├── main.go                        # JSON-RPC over stdin/stdout, TUNA session mgmt, audio/video multiplexing
 └── go.mod                         # Go module (nkn-sdk-go, nkn-tuna-session)
 ```
 
@@ -196,7 +197,7 @@ interface MessageData {
 | `privateGroup:invitation` / `accept` / `subscribe` / `quit` | Private group lifecycle |
 | `privateGroup:optionRequest` / `optionResponse` / `memberRequest` / `memberResponse` | Group sync |
 | `discovery:broadcast` | P2P public group discovery broadcast |
-| `voiceCall:invite` / `accept` / `decline` / `end` | Voice call signaling |
+| `voiceCall:invite` / `accept` / `decline` / `end` / `videoToggle` | Voice/video call signaling |
 
 ### IPFS Encryption
 - AES-128-GCM: 16-byte key, 12-byte nonce prepended to ciphertext

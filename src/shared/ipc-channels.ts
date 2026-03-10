@@ -131,8 +131,11 @@ export const IPC = {
     DECLINE_CALL: "voice:declineCall",
     END_CALL: "voice:endCall",
     SEND_AUDIO: "voice:sendAudio",
+    SEND_VIDEO: "voice:sendVideo",
+    TOGGLE_VIDEO: "voice:toggleVideo",
     ON_CALL_STATE: "voice:onCallState",
     ON_AUDIO_DATA: "voice:onAudioData",
+    ON_VIDEO_DATA: "voice:onVideoData",
     ON_INCOMING_CALL: "voice:onIncomingCall",
   },
 } as const;

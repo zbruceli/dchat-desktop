@@ -33,6 +33,7 @@ export type { BotWalletInfo } from "./bot";
 
 export type {
   CallState,
+  CallType,
   VoiceCallSignal,
   VoiceCallStateUpdate,
   IncomingCallInfo,

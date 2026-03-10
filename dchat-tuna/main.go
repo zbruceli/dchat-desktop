@@ -304,6 +304,12 @@ func (s *Server) handleReject(id int, params json.RawMessage) {
 	s.sendResponse(Response{ID: id, Result: map[string]interface{}{"ok": true}})
 }
 
+// Media type bytes for multiplexing audio and video over a single TUNA session
+const (
+	MediaTypeAudio byte = 0x01
+	MediaTypeVideo byte = 0x02
+)
+
 // sendAudio: Queue audio data for serialized writing (fire-and-forget, no response)
 func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 	var p struct {
@@ -327,11 +333,13 @@ func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 		return // silently drop
 	}
 
-	// Frame format: 2-byte big-endian length prefix + payload
-	frame := make([]byte, 2+len(data))
-	frame[0] = byte(len(data) >> 8)
-	frame[1] = byte(len(data))
-	copy(frame[2:], data)
+	// Frame format: 2-byte big-endian length prefix + 1-byte type + payload
+	frame := make([]byte, 3+len(data))
+	totalLen := 1 + len(data) // type byte + payload
+	frame[0] = byte(totalLen >> 8)
+	frame[1] = byte(totalLen)
+	frame[2] = MediaTypeAudio
+	copy(frame[3:], data)
 
 	// Queue for serialized writing — non-blocking to avoid stalling stdin reader
 	select {
@@ -341,6 +349,44 @@ func (s *Server) handleSendAudio(id int, params json.RawMessage) {
 		log.Printf("Warning: WriteCh full for session %s, dropping audio frame", p.SessionID)
 	}
 	// NO response sent — fire and forget
+}
+
+// sendVideo: Queue video data for serialized writing (fire-and-forget, no response)
+func (s *Server) handleSendVideo(id int, params json.RawMessage) {
+	var p struct {
+		SessionID string `json:"sessionId"`
+		Data      string `json:"data"` // base64-encoded H.264/VP8 frame
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return
+	}
+
+	s.mu.Lock()
+	session, exists := s.sessions[p.SessionID]
+	s.mu.Unlock()
+
+	if !exists {
+		return
+	}
+
+	data, err := base64.StdEncoding.DecodeString(p.Data)
+	if err != nil {
+		return
+	}
+
+	// Frame format: 2-byte big-endian length prefix + 1-byte type + payload
+	frame := make([]byte, 3+len(data))
+	totalLen := 1 + len(data)
+	frame[0] = byte(totalLen >> 8)
+	frame[1] = byte(totalLen)
+	frame[2] = MediaTypeVideo
+	copy(frame[3:], data)
+
+	select {
+	case session.WriteCh <- frame:
+	default:
+		log.Printf("Warning: WriteCh full for session %s, dropping video frame", p.SessionID)
+	}
 }
 
 // writeLoop drains the WriteCh and writes frames serially to session.Conn
@@ -526,16 +572,16 @@ func (s *Server) createSession(id, remoteAddr string, conn net.Conn) *ActiveSess
 		RemoteAddr: remoteAddr,
 		Conn:       conn,
 		Done:       make(chan struct{}),
-		WriteCh:    make(chan []byte, 256), // buffer ~5s of audio at 50fps
+		WriteCh:    make(chan []byte, 512), // buffer for audio+video (~65 frames/sec combined)
 	}
 }
 
-// readLoop reads length-prefixed audio frames from a session and emits events
+// readLoop reads length-prefixed frames from a session, demuxes by type byte, and emits events
 func (s *Server) readLoop(session *ActiveSession) {
 	defer s.closeSession(session.ID, "connection closed")
 	log.Printf("readLoop started for session %s", session.ID)
 
-	reader := bufio.NewReaderSize(session.Conn, 64*1024)
+	reader := bufio.NewReaderSize(session.Conn, 128*1024)
 	header := make([]byte, 2)
 	frameCount := 0
 
@@ -566,7 +612,7 @@ func (s *Server) readLoop(session *ActiveSession) {
 			log.Printf("readLoop %s: received connectivity ping!", session.ID)
 			continue
 		}
-		if frameLen > 32000 {
+		if frameLen > 100000 {
 			log.Printf("readLoop %s: skipping invalid frame len=%d", session.ID, frameLen)
 			continue
 		}
@@ -583,11 +629,32 @@ func (s *Server) readLoop(session *ActiveSession) {
 			log.Printf("readLoop %s: received frame #%d, size=%d", session.ID, frameCount, frameLen)
 		}
 
-		s.sendEvent(Event{
-			Event:     "audioData",
-			SessionID: session.ID,
-			Data:      base64.StdEncoding.EncodeToString(frame),
-		})
+		// Demux by type byte (first byte of payload)
+		if frameLen >= 1 {
+			typeByte := frame[0]
+			payload := frame[1:]
+			switch typeByte {
+			case MediaTypeAudio:
+				s.sendEvent(Event{
+					Event:     "audioData",
+					SessionID: session.ID,
+					Data:      base64.StdEncoding.EncodeToString(payload),
+				})
+			case MediaTypeVideo:
+				s.sendEvent(Event{
+					Event:     "videoData",
+					SessionID: session.ID,
+					Data:      base64.StdEncoding.EncodeToString(payload),
+				})
+			default:
+				// Legacy frame without type byte — treat entire frame as audio (backward compat)
+				s.sendEvent(Event{
+					Event:     "audioData",
+					SessionID: session.ID,
+					Data:      base64.StdEncoding.EncodeToString(frame),
+				})
+			}
+		}
 	}
 }
 
@@ -675,6 +742,8 @@ func main() {
 			go server.handleReject(req.ID, req.Params)
 		case "sendAudio":
 			server.handleSendAudio(req.ID, req.Params)
+		case "sendVideo":
+			server.handleSendVideo(req.ID, req.Params)
 		case "hangup":
 			go server.handleHangup(req.ID, req.Params)
 		case "getBalance":

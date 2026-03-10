@@ -11,6 +11,7 @@ import type {
   PrivateGroupMember,
   DiscoveredGroup,
   BotWalletInfo,
+  CallType,
   VoiceCallStateUpdate,
   IncomingCallInfo,
 } from "../shared/types";
@@ -293,8 +294,8 @@ const api = {
       ipcRenderer.invoke("image:save", filePath),
   },
   voice: {
-    startCall: (targetAddress: string): Promise<void> =>
-      ipcRenderer.invoke("voice:startCall", targetAddress),
+    startCall: (targetAddress: string, callType?: CallType): Promise<void> =>
+      ipcRenderer.invoke("voice:startCall", targetAddress, callType),
     acceptCall: (callId: string): Promise<void> =>
       ipcRenderer.invoke("voice:acceptCall", callId),
     declineCall: (callId: string): Promise<void> =>
@@ -303,6 +304,10 @@ const api = {
       ipcRenderer.invoke("voice:endCall"),
     sendAudio: (data: ArrayBuffer): Promise<void> =>
       ipcRenderer.invoke("voice:sendAudio", data),
+    sendVideo: (data: ArrayBuffer): Promise<void> =>
+      ipcRenderer.invoke("voice:sendVideo", data),
+    toggleVideo: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke("voice:toggleVideo", enabled),
     onCallState: (callback: (state: VoiceCallStateUpdate | null) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, state: VoiceCallStateUpdate | null) =>
         callback(state);
@@ -314,6 +319,12 @@ const api = {
         callback(data);
       ipcRenderer.on("voice:onAudioData", handler);
       return () => ipcRenderer.removeListener("voice:onAudioData", handler);
+    },
+    onVideoData: (callback: (data: { callId: string; data: string }) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { callId: string; data: string }) =>
+        callback(data);
+      ipcRenderer.on("voice:onVideoData", handler);
+      return () => ipcRenderer.removeListener("voice:onVideoData", handler);
     },
     onIncomingCall: (callback: (call: IncomingCallInfo | null) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, call: IncomingCallInfo | null) =>
