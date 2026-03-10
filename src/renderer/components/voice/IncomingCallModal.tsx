@@ -43,7 +43,9 @@ export function IncomingCallModal() {
 
         {/* Caller info */}
         <h3 className="text-text-primary text-lg font-semibold mb-1">{displayName}</h3>
-        <p className="text-text-secondary text-sm mb-6">Incoming voice call...</p>
+        <p className="text-text-secondary text-sm mb-6">
+          Incoming {incomingCall.callType === "video" ? "video" : "voice"} call...
+        </p>
 
         {/* Accept / Decline */}
         <div className="flex justify-center gap-4">

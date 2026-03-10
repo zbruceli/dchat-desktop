@@ -25,7 +25,8 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    NSMicrophoneUsageDescription: "D-Chat needs microphone access to record voice messages."
+    NSMicrophoneUsageDescription: "D-Chat needs microphone access for voice calls and voice messages."
+    NSCameraUsageDescription: "D-Chat needs camera access for video calls."
   notarize: true
   target:
     - dmg

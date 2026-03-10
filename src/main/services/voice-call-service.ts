@@ -4,7 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import type { NknClientService } from "./nkn-client-service";
-import type { CallState, VoiceCallSignal, VoiceCallStateUpdate, IncomingCallInfo } from "../../shared/types";
+import type { CallState, CallType, VoiceCallSignal, VoiceCallStateUpdate, IncomingCallInfo } from "../../shared/types";
 import { IPC } from "../../shared/ipc-channels";
 
 interface SidecarRequest {
@@ -32,6 +32,8 @@ interface ActiveCall {
   state: CallState;
   tunaSessionId?: string;
   startedAt?: number;
+  callType: CallType;
+  isVideoEnabled: boolean;
 }
 
 const VOICE_CALL_CONTENT_TYPES = new Set([
@@ -39,6 +41,7 @@ const VOICE_CALL_CONTENT_TYPES = new Set([
   "voiceCall:accept",
   "voiceCall:decline",
   "voiceCall:end",
+  "voiceCall:videoToggle",
 ]);
 
 const MIN_BALANCE_NKN = 1;
@@ -199,11 +202,14 @@ export class VoiceCallService extends EventEmitter {
       case "voiceCall:end":
         this.handleRemoteEnd(src, signal);
         break;
+      case "voiceCall:videoToggle":
+        this.handleRemoteVideoToggle(src, signal);
+        break;
     }
   }
 
   /** Start an outgoing call */
-  async startCall(targetAddress: string): Promise<void> {
+  async startCall(targetAddress: string, callType: CallType = "voice"): Promise<void> {
     if (this.activeCall) {
       throw new Error("A call is already active");
     }
@@ -215,6 +221,8 @@ export class VoiceCallService extends EventEmitter {
       callId,
       remoteAddress: targetAddress,
       state: "ringing",
+      callType,
+      isVideoEnabled: callType === "video",
     };
     this.pushCallState();
 
@@ -238,8 +246,10 @@ export class VoiceCallService extends EventEmitter {
       codec: "opus",
       sampleRate: 48000,
       tunaPubAddrs: this.cachedPubAddrs ?? undefined,
+      callType,
+      videoCodec: callType === "video" ? "vp8" : undefined,
     };
-    console.log(`[VoiceCall] Sending invite with tunaPubAddrs: ${!!signal.tunaPubAddrs}, cachedPubAddrs: ${this.cachedPubAddrs?.substring(0, 50)}`);
+    console.log(`[VoiceCall] Sending invite with tunaPubAddrs: ${!!signal.tunaPubAddrs}, callType: ${callType}`);
 
     this.nknClient.sendMessageNoReply(targetAddress, JSON.stringify({
       id: callId,
@@ -259,11 +269,14 @@ export class VoiceCallService extends EventEmitter {
 
     const remoteAddress = this.incomingCall.remoteAddress;
     const callerPubAddrs = this.incomingCall.tunaPubAddrs;
+    const callType = this.incomingCall.callType ?? "voice";
 
     this.activeCall = {
       callId,
       remoteAddress,
       state: "connecting",
+      callType,
+      isVideoEnabled: callType === "video",
     };
     this.incomingCall = null;
     this.pushCallState();
@@ -348,6 +361,42 @@ export class VoiceCallService extends EventEmitter {
     this.endCallInternal("local hangup");
   }
 
+  /** Send a video frame to the active call */
+  sendVideo(data: ArrayBuffer): void {
+    if (!this.activeCall?.tunaSessionId || this.activeCall.state !== "connected") return;
+    if (!this.activeCall.isVideoEnabled) return;
+
+    const base64Data = Buffer.from(data).toString("base64");
+    this.sendCommandNoWait("sendVideo", {
+      sessionId: this.activeCall.tunaSessionId,
+      data: base64Data,
+    });
+  }
+
+  /** Toggle video on/off mid-call and notify remote */
+  toggleVideo(enabled: boolean): void {
+    if (!this.activeCall) return;
+    this.activeCall.isVideoEnabled = enabled;
+    if (enabled && this.activeCall.callType === "voice") {
+      this.activeCall.callType = "video";
+    }
+    this.pushCallState();
+
+    // Notify remote peer
+    this.nknClient.sendMessageNoReply(this.activeCall.remoteAddress, JSON.stringify({
+      id: this.activeCall.callId,
+      contentType: "voiceCall:videoToggle",
+      content: JSON.stringify({
+        callId: this.activeCall.callId,
+        codec: "opus",
+        sampleRate: 48000,
+        callType: this.activeCall.callType,
+        videoEnabled: enabled,
+      }),
+      timestamp: Date.now(),
+    }));
+  }
+
   private audioSendCount = 0;
   /** Send an audio frame to the active call */
   sendAudio(data: ArrayBuffer): void {
@@ -389,9 +438,10 @@ export class VoiceCallService extends EventEmitter {
       callId: signal.callId,
       remoteAddress: src,
       tunaPubAddrs: signal.tunaPubAddrs,
+      callType: signal.callType ?? "voice",
     };
 
-    console.log(`[VoiceCall] Incoming invite from ${src.substring(0, 8)}..., tunaPubAddrs=${!!signal.tunaPubAddrs}`);
+    console.log(`[VoiceCall] Incoming invite from ${src.substring(0, 8)}..., tunaPubAddrs=${!!signal.tunaPubAddrs}, callType=${signal.callType ?? "voice"}`);
     this.pushToRenderer(IPC.VOICE.ON_INCOMING_CALL, this.incomingCall);
   }
 
@@ -450,6 +500,15 @@ export class VoiceCallService extends EventEmitter {
     this.endCallInternal("declined by remote");
   }
 
+  private handleRemoteVideoToggle(_src: string, signal: VoiceCallSignal & { videoEnabled?: boolean }): void {
+    if (!this.activeCall || this.activeCall.callId !== signal.callId) return;
+    // Remote toggled their video — update our call type to reflect video capability
+    if (signal.callType === "video") {
+      this.activeCall.callType = "video";
+    }
+    this.pushCallState();
+  }
+
   private handleRemoteEnd(_src: string, signal: VoiceCallSignal): void {
     if (!this.activeCall || this.activeCall.callId !== signal.callId) return;
 
@@ -485,6 +544,8 @@ export class VoiceCallService extends EventEmitter {
       remoteAddress: this.activeCall.remoteAddress,
       state: this.activeCall.state,
       startedAt: this.activeCall.startedAt,
+      callType: this.activeCall.callType,
+      isVideoEnabled: this.activeCall.isVideoEnabled,
     };
 
     this.pushToRenderer(IPC.VOICE.ON_CALL_STATE, update);
@@ -546,6 +607,16 @@ export class VoiceCallService extends EventEmitter {
           // Forward audio data to renderer
           if (msg.data) {
             this.pushToRenderer(IPC.VOICE.ON_AUDIO_DATA, {
+              callId: this.activeCall?.callId,
+              data: msg.data,
+            });
+          }
+          break;
+
+        case "videoData":
+          // Forward video data to renderer
+          if (msg.data) {
+            this.pushToRenderer(IPC.VOICE.ON_VIDEO_DATA, {
               callId: this.activeCall?.callId,
               data: msg.data,
             });

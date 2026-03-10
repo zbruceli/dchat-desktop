@@ -70,9 +70,20 @@ function createWindow(): BrowserWindow {
     mainWindow.loadFile(path.join(__dirname, "../../renderer/index.html"));
   }
 
+  // Auto-approve microphone and camera permission requests (required for Windows/Linux packaged builds)
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowedPermissions = ["media", "microphone", "camera", "audioCapture", "videoCapture"];
+    callback(allowedPermissions.includes(permission));
+  });
+
+  mainWindow.webContents.session.setPermissionCheckHandler((_webContents, permission) => {
+    const allowedPermissions = ["media", "microphone", "camera", "audioCapture", "videoCapture"];
+    return allowedPermissions.includes(permission);
+  });
+
   // Forward renderer console to main process stdout for debugging
   mainWindow.webContents.on("console-message", (_event, level, message) => {
-    if (message.includes("Voice") || message.includes("Audio") || message.includes("worklet") || message.includes("getUserMedia")) {
+    if (message.includes("Voice") || message.includes("Audio") || message.includes("Video") || message.includes("worklet") || message.includes("getUserMedia")) {
       console.log(`[renderer] ${message}`);
     }
   });
