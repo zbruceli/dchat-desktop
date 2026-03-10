@@ -2,12 +2,14 @@ import React from "react";
 import { useSessionStore } from "../../stores/session-store";
 import { useChatStore } from "../../stores/chat-store";
 import { useContactStore } from "../../stores/contact-store";
+import { useDiscoveryStore } from "../../stores/discovery-store";
 
 export function SessionList() {
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
   const contacts = useContactStore((s) => s.contacts);
+  const discoveredGroups = useDiscoveryStore((s) => s.groups);
 
   if (sessions.length === 0) {
     return (
@@ -39,6 +41,10 @@ export function SessionList() {
         const avatarUrl = contact?.avatarUri
           ? `dchat-media://contact-cache/${contact.avatarUri}`
           : null;
+        const discoveredGroup = isTopic ? discoveredGroups.find((g) => g.topicName === session.targetAddress) : undefined;
+        const topicAvatarUrl = discoveredGroup?.avatarUri
+          ? `dchat-media://discovery-cache/${discoveredGroup.avatarUri}`
+          : null;
         const preview = session.lastMessageContent || "No messages yet";
         const time = session.lastMessageAt
           ? new Date(session.lastMessageAt).toLocaleTimeString([], {
@@ -60,6 +66,8 @@ export function SessionList() {
             }`}>
               {isDirect && avatarUrl ? (
                 <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+              ) : isTopic && topicAvatarUrl ? (
+                <img src={topicAvatarUrl} alt={displayName} className="w-full h-full object-cover" />
               ) : (
                 <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
                   {isTopic ? "#" : isPrivateGroup ? (

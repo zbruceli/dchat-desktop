@@ -135,7 +135,7 @@ app.whenReady().then(() => {
   // Register dchat-media:// protocol handler
   protocol.handle("dchat-media", async (request) => {
     const url = new URL(request.url);
-    const filePath = path.join(userDataPath, url.hostname, url.pathname);
+    const filePath = path.join(userDataPath, url.hostname, decodeURIComponent(url.pathname));
 
     // Prevent path traversal — resolved path must stay within userDataPath
     const resolvedPath = path.resolve(filePath);
@@ -284,6 +284,7 @@ app.whenReady().then(() => {
     );
     chatService.setDiscoveryService(discoveryService);
     discoveryService.setTopicService(topicService);
+    discoveryService.setMessageRepo(messageRepo);
 
     // Voice call service
     const voiceCallService = new VoiceCallService(nknClient, pushToRenderer, seed);

@@ -5,6 +5,7 @@ import { useTopicStore } from "../../stores/topic-store";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
 import { useContactStore } from "../../stores/contact-store";
 import { useClientStore } from "../../stores/client-store";
+import { useDiscoveryStore } from "../../stores/discovery-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { useUserProfilePanelStore } from "../../stores/user-profile-panel-store";
 import { truncateAddress } from "../../utils/address";
@@ -204,6 +205,7 @@ export function MessageThread() {
   const groups = usePrivateGroupStore((s) => s.groups);
   const quitGroup = usePrivateGroupStore((s) => s.quitGroup);
   const contacts = useContactStore((s) => s.contacts);
+  const discoveredGroups = useDiscoveryStore((s) => s.groups);
 
   const [leaving, setLeaving] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -226,6 +228,10 @@ export function MessageThread() {
     : session?.targetName) || "";
   const headerAvatarUrl = directContact?.avatarUri
     ? `dchat-media://contact-cache/${directContact.avatarUri}`
+    : null;
+  const discoveredGroup = isTopic && topicName ? discoveredGroups.find((g) => g.topicName === topicName) : undefined;
+  const topicAvatarUrl = discoveredGroup?.avatarUri
+    ? `dchat-media://discovery-cache/${discoveredGroup.avatarUri}`
     : null;
 
   // Close panels when switching sessions
@@ -325,6 +331,8 @@ export function MessageThread() {
           >
             {isDirect && headerAvatarUrl ? (
               <img src={headerAvatarUrl} alt={displayName} className="w-full h-full object-cover" />
+            ) : isTopic && topicAvatarUrl ? (
+              <img src={topicAvatarUrl} alt={displayName} className="w-full h-full object-cover" />
             ) : (
               <span className={`text-sm ${isTopic ? "text-accent-400 font-bold" : isPrivateGroup ? "text-emerald-400" : "text-text-secondary"}`}>
                 {isTopic ? "#" : isPrivateGroup ? (

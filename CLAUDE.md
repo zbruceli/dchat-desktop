@@ -29,8 +29,9 @@ Electron port of [nMobile](https://github.com/nknorg/nMobile) — end-to-end enc
 ### Group Chat
 - **Public topics** — NKN blockchain subscriptions, topic hash = `"dchat" + hex(sha1(name))`, messages sent individually to subscribers, Unicode topic names supported
 - **Private groups** — Off-chain Ed25519 dual-signature membership, owner/admin/member permissions, invite/kick/leave, member sync protocol
-- **Public group discovery** — P2P discovery via shared `publicGroups` NKN topic, 10-min broadcast interval, blockchain subscriber count verification, 7-day stale cleanup, seed groups (d-chat, nkn, general, nMobile, nkn-chat, 中文), Discover tab with search/category filters
-- **Create & broadcast public group** — Create public groups from Discover page with name, description, category, avatar; blockchain subscribe + immediate P2P broadcast; announcement messages rendered as group cards in #publicGroups
+- **Public group discovery** — P2P discovery via shared `publicGroups` NKN topic, 10-min broadcast interval, blockchain subscriber count verification, 7-day stale cleanup, seed groups (d-chat, nkn, general, nMobile, nkn-chat, 中文), Discover tab with search/category filters, group avatars propagated via announcements
+- **Create & broadcast public group** — Create public groups from Discover page with name, description, category, avatar; blockchain subscribe + immediate P2P broadcast; announcement messages stored and rendered as group cards in #publicGroups chat thread
+- **Group avatars** — Avatars cached in `discovery-cache/`, propagated via announcement broadcasts, displayed in Discover tab, session list, and chat header; startup scan extracts avatars from existing announcement messages
 
 ### Identity & Security
 - NKN wallet — Create/import/export keystore, send/receive NKN tokens

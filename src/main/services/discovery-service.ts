@@ -7,6 +7,7 @@ import type { TopicService } from "./topic-service";
 import type { TopicRepository } from "../db/repositories/topic-repository";
 import type { TopicSubscriberRepository } from "../db/repositories/topic-subscriber-repository";
 import type { DiscoveredGroupRepository } from "../db/repositories/discovered-group-repository";
+import type { MessageRepository } from "../db/repositories/message-repository";
 import type { DiscoveredGroup, DiscoveryBroadcastMessage, AnnouncementMessage, AnnouncementGroup } from "../../shared/types";
 import { genTopicHash } from "../utils/topic-hash";
 
@@ -35,6 +36,7 @@ export class DiscoveryService {
   private discoveryTopicHash: string;
   private discoveryCacheDir: string;
   private topicService: TopicService | null = null;
+  private messageRepo: MessageRepository | null = null;
 
   constructor(
     private nknClient: NknClientService,
@@ -53,6 +55,9 @@ export class DiscoveryService {
   async start(): Promise<void> {
     // Seed bootstrap groups immediately (DB-only, no network needed)
     this.seedBootstrapGroups();
+
+    // Scan existing announcement messages for uncached avatars
+    this.scanExistingAnnouncementsForAvatars();
 
     // Wait for NKN client to connect before subscribing and broadcasting
     const status = this.nknClient.getStatus();
@@ -153,12 +158,28 @@ export class DiscoveryService {
     // Build unique group list, prioritize joined topics
     const groupMap = new Map<string, AnnouncementGroup>();
 
+    // Index discovered groups for metadata/avatar lookup
+    const discoveredMap = new Map(discoveredGroups.map((g) => [g.topicName, g]));
+
     for (const topic of joinedTopics) {
-      groupMap.set(topic.id, {
+      const discovered = discoveredMap.get(topic.id);
+      const announcementGroup: AnnouncementGroup = {
         topicId: topic.id,
         name: topic.id,
+        description: discovered?.description,
+        category: discovered?.category,
         subscriberCount: topic.memberCount,
-      });
+      };
+
+      // Include cached avatar if available
+      if (discovered?.avatarUri) {
+        const avatarData = this.readCachedAvatar(discovered.avatarUri);
+        if (avatarData) {
+          announcementGroup.avatar = avatarData;
+        }
+      }
+
+      groupMap.set(topic.id, announcementGroup);
     }
 
     for (const group of discoveredGroups) {
@@ -327,6 +348,84 @@ export class DiscoveryService {
 
   setTopicService(topicService: TopicService): void {
     this.topicService = topicService;
+  }
+
+  setMessageRepo(messageRepo: MessageRepository): void {
+    this.messageRepo = messageRepo;
+  }
+
+  /**
+   * Scan existing announcement messages in the publicGroups session
+   * and extract/cache any avatars that haven't been cached yet.
+   */
+  scanExistingAnnouncementsForAvatars(): void {
+    if (!this.messageRepo) return;
+
+    const sessionId = `topic:${DISCOVERY_TOPIC_NAME}`;
+    // Read recent messages (up to 500) from the publicGroups session
+    const messages = this.messageRepo.findBySessionId(sessionId, 500, 0);
+    let cached = 0;
+
+    for (const msg of messages) {
+      if (msg.contentType !== "text" && msg.contentType !== "textExtension") continue;
+      if (!msg.content) continue;
+
+      // Try to parse as announcement (base64 first, then direct JSON)
+      let announcement: AnnouncementMessage | null = null;
+      try {
+        const decoded = Buffer.from(msg.content, "base64").toString("utf-8");
+        const parsed = JSON.parse(decoded);
+        if (parsed.type === "announcement" || parsed.type === "periodic") {
+          announcement = parsed as AnnouncementMessage;
+        }
+      } catch {
+        // Try direct JSON
+      }
+      if (!announcement) {
+        try {
+          const parsed = JSON.parse(msg.content);
+          if (parsed.type === "announcement" || parsed.type === "periodic") {
+            announcement = parsed as AnnouncementMessage;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (!announcement?.payload?.groups) continue;
+
+      for (const g of announcement.payload.groups) {
+        if (!g.topicId || !g.avatar?.data || !g.avatar?.ext) continue;
+
+        // Check if we already have the avatar cached
+        const existing = this.discoveredGroupRepo.findByTopicName(g.topicId);
+        if (existing?.avatarUri) {
+          const filePath = path.join(this.discoveryCacheDir, existing.avatarUri);
+          if (fs.existsSync(filePath)) continue; // Already cached
+        }
+
+        // Cache the avatar
+        const avatarUri = this.cacheAvatar(g.topicId, g.avatar.data, g.avatar.ext);
+        if (avatarUri) {
+          // Update the discovered group with the avatar
+          this.discoveredGroupRepo.upsert({
+            topicName: g.topicId,
+            description: g.description ?? g.name,
+            category: g.category,
+            subscriberCount: g.subscriberCount ?? 0,
+            reportedBy: msg.sender,
+            lastReportedAt: msg.createdAt,
+            avatarUri,
+          });
+          cached++;
+        }
+      }
+    }
+
+    if (cached > 0) {
+      console.log(`[DiscoveryService] Scanned existing messages, cached ${cached} new avatars`);
+      this.pushDiscoveryUpdate();
+    }
   }
 
   async createAndBroadcastGroup(params: {

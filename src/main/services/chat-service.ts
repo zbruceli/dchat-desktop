@@ -620,6 +620,18 @@ export class ChatService {
       if (this.discoveryService) {
         this.discoveryService.handleAnnouncementMessage(src, raw as AnnouncementMessage);
       }
+      // Also store as a topic message in #publicGroups so it's visible in the chat thread
+      if (this.topicService) {
+        const announcementContent = Buffer.from(JSON.stringify(raw)).toString("base64");
+        const topicMessageData: MessageData = {
+          id: crypto.randomUUID(),
+          contentType: "text",
+          content: announcementContent,
+          topic: "publicGroups",
+          timestamp: Date.now(),
+        };
+        this.topicService.handleIncomingTopicMessage(src, topicMessageData);
+      }
       return;
     }
 
@@ -672,6 +684,34 @@ export class ChatService {
     if (messageData.topic && this.topicService) {
       if (DISPLAYABLE_TYPES.has(contentType)) {
         this.topicService.handleIncomingTopicMessage(src, messageData);
+      }
+      // Also extract announcement data from topic messages for discovery (avatars, metadata)
+      if (this.discoveryService && (contentType === "text" || contentType === "textExtension") && messageData.content) {
+        let announcementMsg: AnnouncementMessage | null = null;
+        // Try base64 decode first (D-Chat / nMobile 2026 format)
+        try {
+          const decoded = Buffer.from(messageData.content, "base64").toString("utf-8");
+          const parsed = JSON.parse(decoded);
+          if (parsed.type === "announcement" || parsed.type === "periodic") {
+            announcementMsg = parsed as AnnouncementMessage;
+          }
+        } catch {
+          // Not base64, try direct JSON
+        }
+        // Fallback: try direct JSON parse (some clients may send unencoded)
+        if (!announcementMsg) {
+          try {
+            const parsed = JSON.parse(messageData.content);
+            if (parsed.type === "announcement" || parsed.type === "periodic") {
+              announcementMsg = parsed as AnnouncementMessage;
+            }
+          } catch {
+            // Not an announcement
+          }
+        }
+        if (announcementMsg) {
+          this.discoveryService.handleAnnouncementMessage(src, announcementMsg);
+        }
       }
       return;
     }

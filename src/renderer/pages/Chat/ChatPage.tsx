@@ -4,6 +4,7 @@ import { useContactStore } from "../../stores/contact-store";
 import { useChatStore } from "../../stores/chat-store";
 import { useTopicStore } from "../../stores/topic-store";
 import { usePrivateGroupStore } from "../../stores/private-group-store";
+import { useDiscoveryStore } from "../../stores/discovery-store";
 import { SessionList } from "../../components/chat/SessionList";
 import { MessageThread } from "../../components/chat/MessageThread";
 
@@ -12,6 +13,7 @@ export function ChatPage() {
   const loadContacts = useContactStore((s) => s.loadContacts);
   const loadTopics = useTopicStore((s) => s.loadTopics);
   const loadGroups = usePrivateGroupStore((s) => s.loadGroups);
+  const loadDiscoveredGroups = useDiscoveryStore((s) => s.loadGroups);
   const contacts = useContactStore((s) => s.contacts);
   const startSession = useChatStore((s) => s.startSession);
   const createTopic = useTopicStore((s) => s.createTopic);
@@ -32,7 +34,8 @@ export function ChatPage() {
     loadContacts();
     loadTopics();
     loadGroups();
-  }, [loadSessions, loadContacts, loadTopics, loadGroups]);
+    loadDiscoveredGroups();
+  }, [loadSessions, loadContacts, loadTopics, loadGroups, loadDiscoveredGroups]);
 
   async function handleNewChat(address: string) {
     if (!address.trim()) return;
