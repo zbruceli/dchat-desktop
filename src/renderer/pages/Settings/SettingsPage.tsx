@@ -340,9 +340,9 @@ function NknBotSection() {
     }
   }
 
-  async function handleCopySeed() {
+  function handleCopySeed() {
     if (!bot) return;
-    await navigator.clipboard.writeText(bot.seed);
+    (window as any).clipboardWriteText(bot.seed);
     setSeedCopied(true);
     setTimeout(() => setSeedCopied(false), 1500);
   }

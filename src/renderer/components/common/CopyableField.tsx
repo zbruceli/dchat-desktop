@@ -3,8 +3,8 @@ import React, { useState } from "react";
 export function CopyableField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
 
-  async function handleCopy() {
-    await navigator.clipboard.writeText(value);
+  function handleCopy() {
+    (window as any).clipboardWriteText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }

@@ -501,7 +501,7 @@ function MessageActions({ text }: { text: string }) {
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(text);
+      (window as any).clipboardWriteText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -535,10 +535,10 @@ function MessageActions({ text }: { text: string }) {
   );
 }
 
-/** Check if a message has copyable text content */
+/** Check if a message has copyable text content (burn-after-read excluded) */
 function isCopyableMessage(message: Message): boolean {
   const ct = message.contentType;
-  return (ct === "text" || ct === "textExtension") && !!message.content;
+  return ct === "text" && !!message.content;
 }
 
 export function MessageBubble({ message, showSender }: MessageBubbleProps) {
@@ -627,6 +627,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     </>
   );
 
+  const isBurn = message.contentType === "textExtension";
   const copyable = isCopyableMessage(message) && !announcement;
 
   // Outbound messages: right-aligned with accent bubble, no avatar
@@ -642,7 +643,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             </span>
             <span className="text-[11px] text-text-muted">{time}</span>
           </div>
-          <div className="bg-accent-600 rounded-2xl rounded-br-sm px-4 py-2 select-text">
+          <div className={`bg-accent-600 rounded-2xl rounded-br-sm px-4 py-2 ${isBurn ? "select-none" : "select-text"}`}>
             {messageContent}
           </div>
         </div>
@@ -680,7 +681,7 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
             <span className="text-[11px] text-text-muted">{time}</span>
             {message.deleteAt && <BurnIndicator deleteAt={message.deleteAt} />}
           </div>
-          <div className="bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2 select-text">
+          <div className={`bg-surface-raised rounded-2xl rounded-bl-sm px-4 py-2 ${isBurn ? "select-none" : "select-text"}`}>
             {messageContent}
           </div>
         </div>

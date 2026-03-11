@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, clipboard } from "electron";
 import type {
   Message,
   Contact,
@@ -336,5 +336,9 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld("dchat", api);
+
+contextBridge.exposeInMainWorld("clipboardWriteText", (text: string) => {
+  clipboard.writeText(text);
+});
 
 export type DchatAPI = typeof api;
