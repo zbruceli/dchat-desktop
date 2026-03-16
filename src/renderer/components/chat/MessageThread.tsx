@@ -16,6 +16,84 @@ import { PrivateGroupMemberPanel } from "./PrivateGroupMemberPanel";
 import { ContactEditPanel } from "../contact/ContactEditPanel";
 import { CallButton } from "../voice/CallButton";
 
+function UnknownContactPanel({ address, onClose }: { address: string; onClose: () => void }) {
+  const addContact = useContactStore((s) => s.addContact);
+  const loadContacts = useContactStore((s) => s.loadContacts);
+  const [name, setName] = useState("");
+  const [adding, setAdding] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  async function handleAdd() {
+    setAdding(true);
+    try {
+      await addContact(address, name.trim() || undefined);
+      await loadContacts();
+      onClose();
+    } catch (err) {
+      console.error("Failed to add contact:", err);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  return (
+    <div className="w-80 border-l border-surface-border flex flex-col bg-surface-deep">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
+        <h3 className="text-sm font-semibold text-text-secondary">Unknown Contact</h3>
+        <button
+          onClick={onClose}
+          className="text-text-faint hover:text-text-secondary transition-colors text-lg leading-none"
+        >
+          &times;
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <div className="flex justify-center">
+          <div className="w-20 h-20 rounded-lg bg-surface-hover flex items-center justify-center">
+            <span className="text-2xl text-text-secondary">
+              {address.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-text-muted mb-1">NKN Address</label>
+          <div className="px-3 py-2 bg-surface-raised/50 border border-surface-border/50 rounded-lg text-text-secondary text-xs font-mono break-all select-all">
+            {address}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Name (optional)</label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+            placeholder="Give this contact a name"
+            className="w-full px-3 py-2 bg-surface-raised border border-surface-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-500/50 placeholder-text-faint"
+          />
+        </div>
+
+        <div className="pt-2">
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            {adding ? "Adding..." : "Add Contact"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SubscriberPanel({
   topicName,
   onClose,
@@ -434,7 +512,14 @@ export function MessageThread() {
       {/* Contact panel for direct chats */}
       {isDirect && showContactPanel && (() => {
         const contact = contacts.find((c) => c.address === session.targetAddress);
-        if (!contact) return null;
+        if (!contact) {
+          return (
+            <UnknownContactPanel
+              address={session.targetAddress}
+              onClose={() => setShowContactPanel(false)}
+            />
+          );
+        }
         return (
           <ContactEditPanel
             contact={contact}
