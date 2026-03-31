@@ -570,10 +570,20 @@ export function MessageBubble({ message, showSender }: MessageBubbleProps) {
     (opts?.fileType === 1 || opts?.fileType === "1" || opts?.fileType === undefined);
   const isIpfsFile =
     message.contentType === "ipfs" && !isIpfsAudio && !isIpfsImage;
-  const time = new Date(message.createdAt).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = (() => {
+    const d = new Date(message.createdAt);
+    const now = new Date();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    if (isToday) return timeStr;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate();
+    if (isYesterday) return `Yesterday ${timeStr}`;
+    const isThisYear = d.getFullYear() === now.getFullYear();
+    const dateStr = d.toLocaleDateString([], isThisYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+    return `${dateStr} ${timeStr}`;
+  })();
 
   const statusIcon =
     message.status === "sending"
